@@ -1,0 +1,39 @@
+{
+  "name": "gala-produkts-saas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Photo-only event gallery SaaS platform",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node platform/server/start.mjs",
+    "start": "node platform/server/staging.mjs",
+    "worker": "node platform/server/staging.mjs --worker",
+    "test": "node --test platform/tests/*.test.mjs",
+    "test:ui": "node platform/tests/browser.cjs",
+    "test:lumiq": "node platform/tests/lumiq-browser.cjs",
+    "build": "node platform/scripts/build.mjs",
+    "migrate": "node platform/scripts/migrate.mjs",
+    "verify": "npm test && npm run build",
+    "browser": "node platform/scripts/verify-browser.mjs",
+    "check": "npm run verify && npm run browser"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1131.0",
+    "@aws-sdk/s3-request-presigner": "3.1131.0",
+    "@electric-sql/pglite": "0.5.8",
+    "fflate": "0.8.3",
+    "libphonenumber-js": "1.13.13",
+    "lucide": "0.468.0",
+    "luxon": "3.7.2",
+    "postgres": "3.4.7",
+    "qrcode": "1.5.4",
+    "sharp": "0.35.4"
+  },
+  "devDependencies": {
+    "acorn": "8.18.0",
+    "playwright": "1.63.0"
+  }
+}

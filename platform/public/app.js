@@ -1,0 +1,32 @@
+import {language,setLanguage} from './i18n.js';
+import {state,api,esc,icon,toast,go,icons,toggleTheme,wireForm,field} from './ui.js';
+import {nav,footer,marketingPage,contactPage,wireContact,authPage,wireAuth} from './marketing.js';
+import {disposeWorkspace,dashboard,wireDashboard,detail,wireDetail,billingPage,wireBilling,checkout,wireCheckout,accountPage,wireAccount,supportPage,adminPage,wireAdmin} from './workspace.js';
+import {guestPage,wireGuest,disposeGuest} from './guest.js';
+let version=0;document.documentElement.lang=language();document.addEventListener('change',e=>{if(!e.target.matches('[data-language]'))return;if(document.querySelector('#upload-queue .queue-item')){e.target.value=language();toast('Finish your photo queue before changing language.',true);return;}if(document.querySelector('form')&&!window.confirm(language()==='lv'?'Mainīt valodu? Nesaglabātie lauki tiks atiestatīti.':'Change language? Unsaved fields will be reset.')){e.target.value=language();return;}setLanguage(e.target.value);render();});
+const experimental=new URLSearchParams(location.search).get('design')==='editorial';document.body.classList.toggle('design-editorial',experimental);if(experimental){const css=document.createElement('link');css.rel='stylesheet';css.href='/editorial-experiment.css';document.head.append(css);}
+document.body.classList.toggle('dark',localStorage.getItem('gf-theme')==='dark');
+async function render(){const request=++version;disposeGuest();disposeWorkspace();const app=document.getElementById('app'),path=location.pathname;document.getElementById('dialog').close();document.getElementById('dialog').onkeydown=null;try{
+ state.config??=await api('/config');state.user=(await api('/auth/session')).user;
+ if(request!==version)return;
+ if((path.startsWith('/app')||path.startsWith('/checkout/'))&&!state.user){go('/login');return;}
+ let html,wire=()=>{};
+ if(path==='/app'){html=await dashboard();wire=wireDashboard;}
+ else if(/^\/app\/events\/[0-9a-f-]+$/i.test(path)){html=await detail(path.split('/')[3]);wire=wireDetail;}
+ else if(path==='/app/billing'){html=await billingPage();wire=wireBilling;}
+ else if(path==='/app/account'){html=accountPage();wire=wireAccount;}
+ else if(path==='/app/support')html=await supportPage();
+ else if(path==='/app/admin'){html=await adminPage();wire=wireAdmin;}
+ else if(path.startsWith('/checkout/')){const id=path.split('/')[2];html=await checkout(id);wire=()=>wireCheckout(id);}
+ else if(path.startsWith('/event/')){const slug=path.split('/')[2];html=await guestPage(slug);wire=()=>wireGuest(slug);}
+ else if(path==='/demo'){const d=await api('/local/demo');go(`/event/${d.slug}`);return;}
+ else if(path==='/sample-workspace'){await api('/local/demo-session',{method:'POST'});go('/app');return;}
+ else if(['/login','/register','/reset'].includes(path)){html=nav()+authPage(path)+footer();wire=()=>wireAuth(path);}
+ else if(path.startsWith('/auth/')){const reset=path==='/auth/reset';html=nav()+`<main id="main" class="narrow"><h1>${reset?'Set a new password':'Confirm your email'}</h1><form id="consume">${reset?field('New password','password','','password','required minlength="12" maxlength="128" autocomplete="new-password"'):'<p>Complete your email verification to continue.</p>'}<p class="error" role="alert"></p><button type="submit" class="primary">${reset?'Save password':'Verify email'}</button></form></main>`+footer();wire=()=>wireForm(document.getElementById('consume'),async input=>{const r=await api('/auth/consume',{method:'POST',body:{token:new URLSearchParams(location.search).get('token'),purpose:path.split('/')[2],...input}});toast(r.message);history.replaceState({},'', '/login');render();});}
+ else if(path==='/contact'){html=nav()+contactPage()+footer();wire=wireContact;}
+ else if(path==='/inbox'){const mails=await api('/local/inbox');html=nav()+`<main id="main" class="narrow"><span class="eyebrow">Local development only</span><h1>Email inbox</h1><p class="muted">No email leaves this computer. Verification and reset links expire after one hour.</p><button id="refresh-inbox">${icon('refresh-cw')}Refresh</button>${mails.map(m=>`<article class="inbox-item"><h3>${esc(m.subject)}</h3><p>To: ${esc(m.recipient)}</p>${m.body.startsWith(location.origin)?`<a href="${esc(m.body)}">${esc(m.body)}</a>`:`<div>${esc(m.body)}</div>`}</article>`).join('')||'<p>No messages yet. Create an account to begin.</p>'}</main>`+footer();wire=()=>document.getElementById('refresh-inbox').onclick=()=>render();}
+ else{const content=marketingPage(path);if(!content)throw new Error('This page could not be found.');html=nav()+content+footer();}
+ if(request!==version)return;app.innerHTML=html;icons();await wire();document.querySelectorAll('[data-theme]').forEach(b=>b.onclick=toggleTheme);document.querySelectorAll('[data-logout]').forEach(b=>b.onclick=async()=>{await api('/auth/logout',{method:'POST'});state.user=null;go('/login');});document.querySelector('.menu-toggle')?.addEventListener('click',e=>{const button=e.currentTarget;const expanded=document.querySelector('.site-nav').classList.toggle('expanded');button.setAttribute('aria-expanded',expanded);});window.scrollTo(0,0);
+ }catch(e){if(request!==version)return;app.innerHTML=(state.config?nav():'')+`<main id="main" class="narrow"><h1>Let's try that again.</h1><p>${esc(e.message)}</p><a class="button primary" href="/">Back home ${icon('arrow-left')}</a></main>`;icons();}}
+document.addEventListener('click',e=>{const a=e.target.closest('a');if(!a||a.hasAttribute('download')||a.target||e.ctrlKey||e.metaKey||e.shiftKey||e.button!==0)return;const url=new URL(a.href);if(url.origin!==location.origin||url.pathname.startsWith('/api/')||url.hash)return;e.preventDefault();go(url.pathname+url.search);});
+window.addEventListener('popstate',render);window.addEventListener('navigation',render);render();

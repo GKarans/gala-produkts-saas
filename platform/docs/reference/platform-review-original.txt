@@ -1,0 +1,642 @@
+Upgrade it from a photo-collection MVP into a dependable event product—not by adding 10× more features, but by making the core experience effortless and trustworthy.
+
+1. Make it reliable before selling it
+Prioritize the problems found in the review:
+
+Fix incomplete ZIP exports and allow download retries.
+Prevent stale requests from mixing event galleries.
+Add upload retries and orphan-file cleanup.
+Make dates, timezones, and retention consistent.
+Allow organizers to edit events and download QR codes before the event.
+Make automated tests reproducible.
+Goal: guests never wonder whether their photo uploaded, and organizers never lose access to their memories.
+
+2. Make uploading excellent on real phones
+This is your most important competitive feature.
+
+Offer Take photo and Choose from gallery separately.
+Support multiple-photo selection with a controlled upload queue.
+Show per-photo progress, thumbnails, success, and retry buttons.
+Keep pending photos locally where supported, with clear storage limitations.
+Handle HEIC conversion and unsupported formats gracefully.
+Resize adaptively instead of rejecting photos after one compression attempt.
+Test weak Wi-Fi, interrupted uploads, camera cancellation, and older phones.
+Start with reliable foreground retries before attempting background uploads.
+
+3. Give organizers a polished event workspace
+Create a straightforward event setup:
+
+Event details → Appearance → Sharing → Ready
+
+Add:
+
+Event timezone and upload window.
+Printable QR posters and table cards.
+Live photo count and refreshable gallery.
+Multi-select, bulk downloads, and bulk deletion.
+Separate archive, restore, and permanent delete.
+Clear storage usage and deletion deadlines.
+Full-resolution export with a visible preparation status.
+Keep guest participation account-free.
+
+4. Build a sustainable paid offering
+For weddings and occasional events, per-event pricing is a better starting hypothesis than subscriptions. Validate it with customers.
+
+Offering	Possible positioning
+Trial	Small test event with limited photos
+Event pass	Larger allowance, customization, gallery sharing, export
+Professional	Multiple events, team access, branding for planners
+Set prices only after measuring storage, processing, download traffic, payment fees, and support costs.
+
+Use hosted checkout and server-side payment confirmation. Model purchases and event entitlements explicitly rather than relying on frontend flags.
+
+Avoid making “one download only” your main cost-control mechanism. Use transparent allowances, retention periods, and reusable prepared exports.
+
+5. Upgrade the architecture incrementally
+Keep Netlify + Supabase for now.
+
+Split script.js into feature modules.
+Introduce TypeScript gradually.
+Use versioned migrations for database changes.
+Separate development, staging, and production.
+Paginate galleries at the database level.
+Move thumbnail processing and large ZIP exports into background jobs.
+Add retryable job states and scheduled cleanup.
+Pin dependencies and automate checks before deployment.
+You do not need microservices, Kubernetes, or a framework rewrite to achieve these improvements.
+
+6. Measure what matters
+Build a small operational dashboard around:
+
+Upload success rate.
+Upload duration and retry rate.
+Guests who upload at least one photo.
+Export success rate.
+Storage and download cost per event.
+Trial-to-purchase conversion.
+Support requests per event.
+Track failures by browser and device without collecting unnecessary personal data.
+
+For the dedicated security and vulnerability review, select Security Analyst Agent from the new Chat menu before accepting paying customers.
+
+My recommended first 90 days
+Period	Focus
+Days 1–30	Reliability fixes, tests, monitoring, mobile upload improvements
+Days 31–60	Event setup, QR materials, reliable exports, retention controls
+Days 61–90	Paid pilot, checkout, measured limits, customer feedback
+Postpone video, facial recognition, automated photo editing, and native apps until customers demonstrate demand.
+
+Your strongest product promise: “Guests scan once, upload easily, and the organizer gets every photo without chasing anyone.” Build every upgrade around delivering that promise.
+
+Me:
+write also to do list and some specifics to do that , so i have detailed list or guide.
+
+Included reference
+Use this as your implementation checklist, ordered from fixing the foundation to launching a paid SaaS. Keep the current Netlify + Supabase architecture while improving it incrementally.
+
+Phase 1 — Fix reliability before adding features
+1. Make ZIP exports complete and retryable
+Current location: script.js → handleDownloadGallery()
+
+ Export all uploaded photos belonging to the event, independently of gallery filters.
+ Fetch every metadata page; do not assume one query returns the complete gallery.
+ Capture the event ID and export file list before starting asynchronous work.
+ Prevent navigation or filter changes from changing an export already in progress.
+ Replace the permanent “downloaded once” restriction with a retryable export workflow.
+ Display photo count, progress, failure reason, and retry action.
+Later backend implementation:
+
+Create an exports table containing:
+id, event_id, status
+requested_at, completed_at, expires_at
+storage_path, photo_count, error_code
+Use states: queued → processing → ready or failed.
+Generate large exports in a background worker with suitable memory and execution limits.
+Reuse a prepared export for repeat downloads rather than regenerating it.
+Done when: filtering to one guest still produces a complete event export, and a canceled download can be retried.
+
+2. Prevent stale gallery responses
+Current location: script.js → loadGallery(), showEventDetail()
+
+ Assign each gallery load a request-generation number.
+ Before updating the UI, verify the request is still current and its event remains selected.
+ Invalidate pending requests when leaving an event or signing out.
+ Apply equivalent checks to profile loading, previews, and design loading.
+ Clear event state and gallery caches on logout.
+Done when: opening A, then B on a slow connection never displays A’s photos under B’s title.
+
+3. Make uploads recoverable
+Current location: script.js → handlePhotoSelected()
+
+ Generate a stable upload ID before uploading anything.
+ Use that ID in storage filenames instead of relying on timestamps alone.
+ Track original upload, thumbnail upload, and metadata completion separately.
+ Retry failed steps without uploading another copy of a completed file.
+ Add timeouts and clear retry messages.
+ Preserve the selected file for an in-page retry.
+ Add a reconciliation job for incomplete uploads and orphaned files.
+Suggested states: pending → uploading → processing → ready, with a recoverable failed state.
+
+Done when: an interrupted metadata save can be retried without duplicating or losing the photo.
+
+4. Fix cover replacement and photo deletion
+Current location: handleSaveGuestDesign(), handleDeletePhoto()
+
+ Save the new cover reference successfully before scheduling removal of the old cover.
+ Clean up a newly uploaded cover if saving its reference fails.
+ Represent photo deletion as a retryable operation.
+ Invalidate gallery cache on partial failures as well as success.
+ Report failed cleanup operations for maintenance.
+Done when: repeated cover replacements do not accumulate unused files, and interrupted deletions eventually reach a consistent state.
+
+Phase 2 — Fix event management
+5. Separate event settings from appearance
+Current location: openEditEventModal(), handleEditSelectedEvent()
+
+ Add separate Event settings and Appearance actions.
+ Connect the existing event-editing dialog to a visible button.
+ Allow corrections to event name, dates, and timezone under explicit rules.
+ Allow appearance editing and QR download before the event starts.
+ Show future guests “Uploads open on …” instead of an ambiguous closed message.
+ Warn before changing dates that affect upload availability or retention.
+Done when: an organizer can prepare the full event experience a week in advance.
+
+6. Unify time handling
+Current location: getIsoDate(), current_app_date(), event date checks.
+
+Choose one initial policy:
+
+Latvia-focused launch: use Europe/Riga consistently.
+International launch: store an IANA timezone on each event, such as Europe/Riga.
+Then:
+
+ Define exactly when uploading starts and stops.
+ Use server-calculated availability as the authoritative result.
+ Display the event timezone beside its schedule.
+ Keep archival and gallery-sharing deadlines consistent with that timezone.
+ Test midnight, daylight-saving transitions, and guests in other countries.
+Done when: guests in different timezones see the same event availability.
+
+7. Separate archive from permanent deletion
+ Define what Archive means: organizational hiding, not file deletion.
+ Allow archived events to be opened or restored within retention.
+ Add a separate permanent-delete flow.
+ Store an explicit retention deadline.
+ Run cleanup on a schedule, not when the organizer opens the dashboard.
+ Show deletion deadlines prominently.
+ Send reminders before permanent cleanup.
+Done when: the UI clearly explains what remains stored, what can be restored, and when files disappear.
+
+Phase 3 — Improve the mobile experience
+8. Add a proper upload queue
+Frontend: split upload logic into its own module.
+
+ Offer Take photo and Choose photos.
+ Allow multiple gallery selections.
+ Start with one or two concurrent uploads; measure before increasing.
+ Show each photo’s thumbnail and status.
+ Add retry and remove actions for failed or pending items.
+ Show an overall summary: “8 uploaded, 1 uploading, 1 needs retry.”
+ Preserve successful queue items while retrying failures.
+ Explain that the page must remain open during uploads.
+Later: persist pending files in IndexedDB where supported, with storage limits and an opt-out. Do not promise background uploading on all phones.
+
+Done when: selecting 20 photos produces 20 individually tracked outcomes.
+
+9. Improve image processing
+Current location: optimizePhotoFile(), resizeImageFile()
+
+ Decode an image once where practical, then generate both output sizes.
+ Reduce quality or dimensions progressively when the output exceeds the size limit.
+ Handle unsupported HEIC/HEIF decoding explicitly.
+ Fall back to another decoding method when available.
+ Preserve correct orientation.
+ Decide whether the product stores originals, optimized copies, or both.
+ Label exports accurately—do not promise originals if only optimized copies are retained.
+ Generate missing thumbnails server-side so successfully uploaded photos are not excluded from shared galleries.
+Done when: supported phone photos produce usable previews and predictable results without silent omissions.
+
+10. Run a real-device release checklist
+ iPhone Safari.
+ Android Chrome.
+ At least one older or lower-memory phone.
+ Camera cancellation.
+ Ten consecutive camera captures.
+ Multi-photo selection.
+ Weak Wi-Fi and mobile data.
+ Connection loss during upload.
+ App switching and returning to the browser.
+ Page reload with unfinished uploads.
+Record device, browser, attempt count, result, and failure details.
+
+Phase 4 — Make galleries scalable and useful
+11. Add pagination and freshness
+Current location: loadGallery(), guest-gallery.js
+
+ Fetch organizer photos in pages.
+ Use stable ordering, such as creation time plus photo ID.
+ Prefer cursor pagination as galleries grow.
+ Add a visible Refresh button.
+ Show “Last updated …”
+ Refresh while an active gallery is visible, using modest polling or realtime notifications.
+ Avoid fetching every photo again when only a few were added.
+ Track signed-URL expiry and renew before reuse.
+Done when: galleries with thousands of photos remain complete and responsive.
+
+12. Add organizer productivity features
+ Multi-select photos.
+ Select all matching a filter, with an explicit count.
+ Bulk deletion with confirmation.
+ Export all photos or selected photos as clearly separate actions.
+ Search/filter by guest.
+ Show upload date and processing status.
+ Add empty, loading, partial-failure, and retry states.
+13. Make sharing predictable
+Current locations: guest-gallery.js, gallery SQL migration.
+
+ Show sharing expiry and remaining allowance clearly.
+ Explain what happens when the allowance is exhausted.
+ Distinguish closed sharing, exhausted allowance, and connection errors.
+ Measure list, thumbnail, and full-photo requests separately.
+ Replace the hardcoded request allowance with an explicit product configuration.
+ Base plan limits on measured costs rather than an arbitrary request count.
+Done when: ordinary guest browsing does not unexpectedly exhaust sharing without useful organizer feedback.
+
+Phase 5 — Make development reproducible
+14. Organize the frontend without a rewrite
+Suggested module boundaries:
+
+Module	Responsibility
+config	Environment-specific public configuration
+auth	Session and account flows
+events	Event queries and management
+uploads	Queue, retries, upload state
+images	Decoding, resizing, thumbnails
+gallery	Pagination, filters, previews
+exports	Export requests and status
+ui	Dialogs, messages, loading controls
+ Move one feature at a time.
+ Preserve behavior with tests before moving it.
+ Introduce TypeScript incrementally.
+ Keep shared state explicit rather than adding more globals.
+15. Repair the test setup
+Current locations: package.json, tests/
+
+ Declare PGlite and Playwright as development dependencies.
+ Document browser installation requirements.
+ Add commands for unit, SQL, and browser tests.
+ Add one command that runs the complete local suite.
+ Test exported functions/modules rather than extracting function text.
+ Add regressions for every Phase 1 bug.
+ Run backend integration tests against an isolated test project.
+ Never exercise cleanup or quota-boundary tests against customer events.
+Done when: a fresh checkout can install dependencies and execute the documented tests.
+
+16. Separate environments and releases
+ Create separate development/staging and production backend environments.
+ Remove hardcoded production redirects from application logic.
+ Pin dependency versions.
+ Put future database changes in ordered migrations.
+ Test a fresh database setup and an upgrade from the previous schema.
+ Automate tests before deployment.
+ Use a release checklist and record the deployed version.
+ Prepare a rollback procedure.
+Phase 6 — Add the commercial layer
+17. Validate a paid event package
+Before building several plans:
+
+ Interview organizers who have used the app.
+ Ask what they struggled with and what alternatives they considered.
+ Offer one paid pilot package.
+ Define photo allowance, retention, sharing duration, and export availability.
+ Measure willingness to pay through actual purchases.
+ Keep subscriptions for repeat users such as planners unless evidence suggests otherwise.
+18. Implement purchases and entitlements
+Suggested records:
+
+Record	Purpose
+orders	Purchase and payment state
+payment_events	Provider event deduplication
+event_entitlements	Features and allowances purchased
+usage_counters	Storage, photos, and other metered usage
+ Use hosted checkout.
+ Confirm payment server-side.
+ Process duplicate provider notifications without granting twice.
+ Handle delayed success, failure, refunds, and cancellations.
+ Show purchased allowances and remaining usage.
+ Avoid relying on the checkout return page to activate a purchase.
+Done when: payment processing remains correct after refreshes, duplicate notifications, or delayed delivery.
+
+19. Measure unit economics
+For each event, record:
+
+Stored bytes.
+Uploaded photo count.
+Processing and export work.
+Download traffic.
+Payment fees.
+Support time.
+Calculate: event revenue minus attributable costs.
+
+Use those numbers to choose prices and limits. Avoid “unlimited” plans until you understand actual usage.
+
+Phase 7 — Prepare for paying customers
+20. Add monitoring and support
+ Capture upload, processing, export, and cleanup failures.
+ Assign request/job IDs so failures can be traced.
+ Track upload success rate and duration.
+ Track export completion rate.
+ Alert on sustained failures and unexpected cost growth.
+ Add a support contact and simple problem-report form.
+ Show the application version in support diagnostics.
+ Avoid including photo contents or unnecessary personal data in logs.
+21. Finish accessibility and onboarding
+ Properly label dialogs and authentication tabs.
+ Test keyboard navigation and focus restoration.
+ Keep important errors visible until dismissed or resolved.
+ Respect reduced-motion preferences.
+ Check contrast in both themes.
+ Test zoom, small screens, and the mobile keyboard.
+ Add a short organizer onboarding flow.
+ Provide printable QR cards and a guest instruction sentence.
+22. Complete launch reviews
+ Define retention and deletion commitments.
+ Prepare terms, privacy information, and refund/support policies with appropriate professional review.
+ Test backup and recovery procedures.
+ Request a dedicated security review using Security Analyst Agent from the new Chat menu.
+ Run a small paid pilot before a broad public launch.
+Your first ten tasks
+Start with this sequence rather than working on every phase at once:
+
+Fix filtered ZIP exports.
+Allow export download retries.
+Add stale-request protection.
+Make upload retries idempotent.
+Fix cover and deletion cleanup.
+Restore event-date editing and advance QR preparation.
+Unify timezone handling.
+Add gallery refresh and pagination.
+Make all tests reproducible.
+Run a real-device pilot and measure failures.
+Release rule: every task needs a clear acceptance test, and every fixed bug gets a regression test wherever practical. Build the paid features only after the photo-to-export journey is dependable.
+
+
+Production SaaS checklist: Event Photo Platform
+The finished product lets customers choose a subscription, pay, create events, customize their guest experience, share links and QR codes, collect photos, and manage galleries—with reliable billing, support, and operations.
+
+Some features already exist in your MVP. Treat each checkbox as implemented, tested, and deployed, not necessarily something to build from scratch.
+
+1. Public website and purchasing
+Marketing website
+ Homepage explains the product with screenshots and a sample event.
+ Separate pages for features, pricing, FAQ, and contact.
+ Interactive demo lets visitors try the guest experience.
+ Clear “Start trial” and “Subscribe” actions.
+ Mobile-friendly layout and accessible navigation.
+ Terms of service, privacy policy, cancellation/refund policy.
+ Basic search-engine metadata and social-sharing previews.
+Pricing
+ Define subscription plans and billing intervals.
+ Show prices, currency, applicable tax treatment, and renewal terms clearly.
+ Define each plan’s:
+Active event allowance.
+Photo/storage allowance.
+Event duration.
+Photo retention.
+Gallery-sharing features.
+Branding/customization features.
+Team member allowance, if offered.
+ Explain what happens when customers reach a limit.
+ Explain what happens to existing events after cancellation.
+ Avoid unlimited usage promises until costs are measured.
+Complete when: customers understand what they buy without contacting you.
+
+2. Customer accounts
+ Registration and email verification.
+ Login, logout, password reset, and persistent sessions.
+ Clear handling of expired or invalid email links.
+ Profile editing.
+ Email-change workflow.
+ Account settings page.
+ Account deletion request with clear consequences.
+ Onboarding checklist after registration.
+ Helpful empty states for new customers.
+ Preserve unfinished event setup when practical.
+Complete when: a new customer can register, verify their email, and reach their dashboard without assistance.
+
+3. Subscription billing
+Use a payment provider with hosted checkout and a customer billing portal.
+
+Purchasing and billing
+ Monthly and/or annual subscriptions.
+ Checkout handles successful, canceled, failed, and delayed payments.
+ Server-side payment notifications update subscription records.
+ Duplicate notifications do not duplicate subscriptions or allowances.
+ Out-of-order notifications do not overwrite newer subscription state.
+ Billing portal supports payment-method updates and invoices.
+ Customers can upgrade, downgrade, and cancel.
+ Proration and effective dates are clearly explained.
+ Renewal receipts and failed-payment notifications.
+ A reconciliation process detects mismatches with the payment provider.
+Subscription lifecycle
+ Define behavior for trialing, active, overdue, canceled, and ended subscriptions.
+ Cancellation normally preserves purchased access until the agreed end date.
+ Define a grace period for failed payments.
+ Define what happens to running events if a subscription lapses.
+ Do not immediately delete photos because a payment fails.
+ Display upcoming renewal, cancellation date, and remaining allowances.
+ Apply purchased capabilities server-side—not just by hiding buttons.
+Complete when: billing remains correct after retries, delayed notifications, cancellation, and renewal failures.
+
+4. Customer dashboard
+ Upcoming, live, completed, and archived event sections.
+ Search and sort events.
+ Subscription and usage summary.
+ Clear “Create event” action.
+ Event cards show dates, photo count, and status.
+ Visible warnings for approaching limits or deletion deadlines.
+ Direct access to billing, account settings, and support.
+ No stale responses or cached data from another session.
+5. Event creation and management
+Event setup
+ Event name and optional description.
+ Start/end time and event timezone.
+ Guest upload opening and closing times.
+ Cover photo and positioning.
+ Custom title, subtitle, and camera-button text.
+ Guest-screen preview.
+ Plan-limit validation before publishing.
+ Save draft and publish.
+ Duplicate an event as a starting template.
+Event lifecycle
+ Draft → scheduled → live → completed → archived.
+ Manual upload pause/resume.
+ Edit event details with clear restrictions.
+ Prepare links, appearance, and QR codes before the event.
+ Archive without permanently deleting files.
+ Restore eligible archived events.
+ Separate permanent-delete action.
+ Display retention and deletion deadlines.
+Complete when: customers can prepare events in advance and manage the entire lifecycle themselves.
+
+6. Links and QR codes
+ Stable guest URL for every published event.
+ Copy-link button with fallback.
+ QR code downloads in print-suitable formats.
+ Printable QR poster/table-card layout.
+ Include event name and short guest instructions.
+ Test printed codes using real phones.
+ Future-event page explains when uploads open.
+ Paused/completed events show the correct state.
+ Optional post-event gallery uses the existing guest link where configured.
+ If links can be replaced, clearly warn that old printed codes stop working.
+7. Guest upload experience
+Guests should not need an account.
+
+ Fast event landing page.
+ Guest name entry and remembered name.
+ Separate Take photo and Choose photos actions.
+ Multiple-photo selection.
+ Upload queue with controlled concurrency.
+ Per-photo preview, progress, success, and retry.
+ Automatic retry for appropriate temporary failures.
+ Stable upload IDs prevent duplicate files during retries.
+ Adaptive compression.
+ Correct orientation and supported-format handling.
+ Clear unsupported-format messages.
+ Reliable thumbnail generation.
+ Visible handling of camera cancellation.
+ Clear behavior when an event closes during an upload.
+ Clear instructions about keeping the page open.
+ No “success” message until the upload has reached the defined completed state.
+Complete when: every selected photo has a clear outcome, including on weak connections.
+
+8. Organizer gallery
+ Paginated thumbnail gallery.
+ Search/filter by guest and date.
+ Newest/oldest sorting.
+ Refresh and newly uploaded photo updates.
+ Full-size preview.
+ Keyboard and swipe navigation.
+ Select multiple photos.
+ Bulk deletion with confirmation.
+ Individual downloads.
+ Separate “Export all” and “Export selected” actions.
+ Complete exports regardless of current pagination.
+ Background preparation for large exports.
+ Export progress and failure recovery.
+ Repeat download of an already prepared export.
+ Renew expired image URLs.
+ Processing failures appear visibly rather than silently hiding photos.
+Complete when: customers can retrieve every retained photo reliably.
+
+9. Optional guest gallery
+ Organizer enables/disables gallery sharing.
+ Configurable availability and expiry.
+ Clearly explain who can view shared photos.
+ Mobile-friendly thumbnails and pagination.
+ Guest filters and sorting.
+ Preview and optional individual downloads.
+ Consistent handling of deleted/unavailable photos.
+ Clear messages for expiry, limits, and connection failures.
+ Published-photo selection if moderation is part of the offering.
+ Usage allowances are visible to the organizer.
+10. Notifications
+ Account verification and password recovery.
+ Subscription confirmation and billing notifications.
+ Event-ready email with link and QR instructions.
+ Approaching storage/usage-limit notifications.
+ Export-ready notification.
+ Retention/deletion reminders.
+ Support acknowledgments.
+ Email delivery failures are monitored.
+ Notification preferences and marketing unsubscribe.
+ Reminder jobs avoid duplicate messages.
+11. Owner/admin operations
+You need tools to run the business—not only customer screens.
+
+ Customer and subscription overview.
+ Event counts and usage overview.
+ Payment reconciliation and refund workflow.
+ Failed upload, processing, export, and cleanup queues.
+ Retry failed background jobs.
+ Support case tracking.
+ Traceable administrative changes.
+ Controlled adjustments to allowances and retention.
+ Cost and revenue reporting.
+ Maintenance/status announcements.
+Route the dedicated security and vulnerability assessment—including customer/admin boundaries and payment integrations—to Security Analyst Agent, available through the new Chat menu.
+
+12. Backend and data foundation
+Keep Supabase, but make business state explicit.
+
+Records	Purpose
+Customer/workspace	Subscription-owning customer
+Memberships	Team participation, if offered
+Plans and entitlements	Purchased capabilities
+Subscriptions	Current billing lifecycle
+Payment events	Notification processing and deduplication
+Events	Schedule, appearance, lifecycle
+Guests	Event participants
+Media/uploads	Files and processing state
+Exports	Prepared downloadable archives
+Gallery shares	Sharing configuration
+Usage records	Metered consumption
+Background jobs	Retryable processing
+Notification deliveries	Message delivery tracking
+ Versioned database migrations.
+ Consistent event timezone handling.
+ Pagination and appropriate query indexes.
+ Retryable background processing.
+ Scheduled retention cleanup.
+ Orphan-file reconciliation.
+ Idempotent operations where requests can repeat.
+ Explicit handling of partial database/storage failures.
+13. Deployment, monitoring, and recovery
+ Separate staging and production.
+ Environment-specific configuration.
+ Pinned dependencies.
+ Automated tests before deployment.
+ Deployment version visible in diagnostics.
+ Rollback procedure.
+ Database backup and restore process.
+ Separate object-storage recovery strategy; database backups alone do not restore photos.
+ Tested recovery procedure.
+ Error monitoring and uptime checks.
+ Alerts for sustained upload/export failures.
+ Storage, download traffic, and processing-cost monitoring.
+ Capacity tests based on expected concurrent events and uploads.
+14. Customer support and business readiness
+ Help center covering setup, uploads, exports, billing, and cancellation.
+ Contact/support form.
+ Published support availability.
+ Documented refund handling.
+ Clear photo-retention commitments.
+ Applicable tax/invoicing requirements reviewed.
+ Privacy, terms, and consumer obligations professionally reviewed for your markets.
+ Product analytics avoid unnecessary personal data.
+ Mobile accessibility, contrast, keyboard navigation, and zoom tested.
+15. Final launch acceptance test
+A person unfamiliar with the project must complete this journey without your help:
+
+ Register and verify an account.
+ Buy a subscription.
+ Receive the correct plan allowances.
+ Create a future event.
+ Customize it and download a printable QR code.
+ Open the guest link on iPhone and Android.
+ Upload multiple photos, including an interrupted upload.
+ See those photos in the organizer gallery.
+ Share the completed gallery.
+ Export every photo and retry the download.
+ Update payment details.
+ Cancel the subscription and retain the promised access.
+ Understand when retained data will be deleted.
+ Contact support successfully.
+Also test failed payments, duplicate payment notifications, full allowances, expired sharing, interrupted exports, and scheduled cleanup.
+
+Recommended build order
+Reliability fixes → account/event lifecycle → uploads and exports → subscription billing → customer dashboard and usage → notifications/admin tools → monitoring/recovery → paid pilot → public launch.
+
+Your launch standard: a customer can purchase, run an event, receive all their photos, manage their subscription, and resolve ordinary problems without manual intervention from you.
+
