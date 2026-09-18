@@ -17,7 +17,7 @@ export function checkMethod(path, method) {
   [/^\/api\/(events|support)$/, ['GET','POST']],
   [/^\/api\/events\/[0-9a-f-]{36}$/, ['GET','PATCH']],
   [/^\/api\/events\/[0-9a-f-]{36}\/photos$/, ['GET','DELETE']],
-  [/^\/api\/events\/[0-9a-f-]{36}\/(action|export|duplicate|cover|curate|preview)$/, ['POST']],
+  [/^\/api\/events\/[0-9a-f-]{36}\/(action|export|duplicate|cover|curate|preview|qr-background)$/, ['POST']],
   [/^\/api\/events\/[0-9a-f-]{36}\/(jobs|qr)$/, ['GET']],
   [/^\/api\/guest\/[\w-]+(?:\/photos)?$/, ['GET']],
   [/^\/api\/guest\/[\w-]+\/(join|reserve|finalize|discard)$/, ['POST']],

@@ -20,6 +20,8 @@ Atver `http://127.0.0.1:5700/`.
 - `/pricing` - cenu plani
 - `/inbox` - lokala verifikacijas un paroles atjaunosanas vestulu kaste
 
+Pasakuma darba vietas QR riks piedava cetrus Lumiq drukas dizainus, kvadrata, A5 un galda kartites formatus. Canva izveidotu JPEG, PNG vai WebP fonu var saglabat privati tikai konkreta pasakuma vajadzibam.
+
 Lokalie dati glabajas `platform/.local/` un netiek versiju kontrole.
 
 ## Parbaude

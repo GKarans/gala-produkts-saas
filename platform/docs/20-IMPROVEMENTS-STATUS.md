@@ -18,5 +18,5 @@
 16. **Automated:** axe, keyboard entry, reduced motion and 200% zoom. Physical VoiceOver/NVDA sign-off remains an external release check.
 17. **Implemented:** first-event checklist and a 15-minute, read-only QR preview that works before publication without consuming an allowance.
 18. **Implemented:** favorites, gallery cover and bulk hide/restore with owner-only auditing.
-19. **Implemented:** high-error-correction QR plus square, A5 and table-card PNG outputs. Preview QR tokens expire after 15 minutes and cannot perform guest actions. Physical print/scan evidence remains a release check.
+19. **Implemented:** high-error-correction QR plus four original Lumiq designs, localized square, A5 and table-card PNG outputs, a Canva poster-maker handoff and private per-event custom background import. Customer designs are not reused without an explicit future consent and moderation process. Preview QR tokens expire after 15 minutes and cannot perform guest actions. Physical print/scan evidence remains a release check.
 20. **Implemented model and billing collection:** 100/10,000-customer calculator, billing address/tax ID collection and legal/pilot gates. Tax approval and paid pilot cannot be completed in source code.
