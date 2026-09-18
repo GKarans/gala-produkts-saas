@@ -18,7 +18,6 @@ Atver `http://127.0.0.1:5700/`.
 - `/sample-workspace` - organizatora demonstracija
 - `/demo` - viesa demonstracija
 - `/pricing` - cenu plani
-- `/lumiq.html` - atseviskais Lumiq dizaina koncepts
 - `/inbox` - lokala verifikacijas un paroles atjaunosanas vestulu kaste
 
 Lokalie dati glabajas `platform/.local/` un netiek versiju kontrole.
@@ -41,6 +40,12 @@ Komanda izpilda backend testus, publisko failu build un izolētu Chromium gala p
 - [Palaisanas kriteriji](platform/docs/LAUNCH-GATES.md)
 - [Drosibas parbaudes](platform/docs/SECURITY-VERIFICATION.md)
 - [Cenu un kapacitates lemumi](platform/docs/PRICING.md)
+- [20 uzlabojumu statuss](platform/docs/20-IMPROVEMENTS-STATUS.md)
+- [Staging un hostinga arhitektura](platform/docs/STAGING-AND-HOSTING.md)
+- [Backup un atjaunosana](platform/docs/BACKUP-RESTORE.md)
+- [Monitorings](platform/docs/OBSERVABILITY.md)
+- [Drosibas audita pakotne](platform/docs/SECURITY-AUDIT-PACK.md)
+- [Izmaksas un juridiskie varti](platform/docs/UNIT-ECONOMICS-AND-LEGAL.md)
 
 ## Statuss
 

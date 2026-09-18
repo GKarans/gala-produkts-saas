@@ -46,9 +46,17 @@ test('recovery, paging, quotas and request boundaries',async t=>{
     const m=i===0?media:await reserve();
     await app.media.upload(e,g,m.id,'photo',image);await app.media.upload(e,g,m.id,'thumb',image);await app.media.finalize(e,g,m.id);
    }
-   const page=await app.media.list(e,new URLSearchParams()),second=await app.media.list(e,new URLSearchParams({offset:'24'}));
+   const page=await app.media.list(e,new URLSearchParams()),second=await app.media.list(e,new URLSearchParams({cursor:page.next}));
    assert.equal(page.photos.length,24);assert.equal(second.photos.length,1);assert.equal(new Set([...page.photos,...second.photos].map(p=>p.id)).size,25);
    assert.equal(page.photos[0].object_key,undefined);
+  });
+  await t.test('Studio maximum gallery uses stable cursors across one thousand photos',async()=>{
+   await db.query(`insert into media(id,event_id,guest_id,object_key,thumbnail_key,name,bytes,thumbnail_bytes,checksum,thumbnail_checksum,status,created_at)
+    select gen_random_uuid(),$1,$2,'load/photo-'||n,'load/thumb-'||n,'load-'||n||'.webp',1024,128,repeat('a',64),repeat('b',64),'uploaded',now()-(n*interval '1 millisecond')
+    from generate_series(1,1000) n`,[e.id,g.id]);
+   const ids=new Set();let cursor=null,pages=0;do{const params=new URLSearchParams();if(cursor)params.set('cursor',cursor);const page=await app.media.list(e,params);page.photos.forEach(photo=>ids.add(photo.id));cursor=page.next;pages++;}while(cursor);
+   assert.equal(ids.size,1025);assert.equal(pages,43);
+   await db.query("delete from media where event_id=$1 and object_key like 'load/%'",[e.id]);
   });
   await t.test('read-only missing-thumbnail report and repair job',async()=>{
    await app.files.remove(media.thumbnail_key);
@@ -128,7 +136,10 @@ test('Supabase adapter keeps provider tokens encrypted and out of browser cookie
  try{
   Object.assign(process.env,{PLATFORM_SUPABASE_URL:'https://isolated-fixture.supabase.co',PLATFORM_SUPABASE_PUBLISHABLE_KEY:'fixture',PLATFORM_SESSION_ENCRYPTION_KEY:'12'.repeat(32)});
   const user={id,email:'auth@example.test',email_confirmed_at:new Date().toISOString(),user_metadata:{name:'Auth'}};
-  const service=supabaseAuthService(db,{origin:'https://staging.example.test',mail:async()=>{},fetcher:async url=>Response.json(url.endsWith('/user')?user:{user,access_token:'private-access-fixture',refresh_token:'private-refresh-fixture',expires_at:Math.floor(Date.now()/1000)+3600})});
+  let tokenRequest;const service=supabaseAuthService(db,{origin:'https://staging.example.test',mail:async()=>{},fetcher:async(url,options)=>{if(url.includes('grant_type=pkce'))tokenRequest=JSON.parse(options.body);return Response.json(url.endsWith('/user')?user:{user,access_token:'private-access-fixture',refresh_token:'private-refresh-fixture',expires_at:Math.floor(Date.now()/1000)+3600});}});
+  const start=service.googleStart(),authorize=new URL(start.url),oauthCookie=start.cookie.split(';')[0];assert.equal(authorize.searchParams.get('provider'),'google');assert.equal(authorize.searchParams.get('code_challenge_method'),'s256');assert(authorize.searchParams.get('code_challenge'));assert.doesNotMatch(start.url,/verifier/);assert.match(start.cookie,/HttpOnly; SameSite=Lax; Secure/);
+  const state=authorize.searchParams.get('state');await assert.rejects(service.googleCallback(new Request('https://staging.example.test',{headers:{Cookie:oauthCookie}}),new URL(`https://staging.example.test/api/auth/google/callback?state=tampered&code=fixture`)),/invalid/);
+  const oauth=await service.googleCallback(new Request('https://staging.example.test',{headers:{Cookie:oauthCookie}}),new URL(`https://staging.example.test/api/auth/google/callback?state=${encodeURIComponent(state)}&code=fixture`));assert(tokenRequest.code_verifier);assert.match(oauth.cookie,/HttpOnly; SameSite=Lax; Secure/);assert.match(oauth.clear,/Max-Age=0/);assert.doesNotMatch(oauth.cookie,/private-access|private-refresh/);
   const login=await service.login({email:user.email,password:'Test-password-123!'});
   assert.match(login.cookie,/HttpOnly; SameSite=Lax; Secure/);assert.doesNotMatch(login.cookie,/private-access|private-refresh/);
   const row=(await db.query('select * from sessions')).rows[0];assert.doesNotMatch(row.provider_session,/private-access|private-refresh/);

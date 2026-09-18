@@ -1,0 +1,4 @@
+.oauth{width:100%;justify-content:center;gap:10px;margin:18px 0 0}
+.oauth strong{font:700 18px/1 system-ui;color:#4285f4}
+.auth-divider{display:flex;align-items:center;gap:12px;margin:16px 0;color:var(--muted);font-size:12px}
+.auth-divider::before,.auth-divider::after{content:"";height:1px;background:var(--line);flex:1}

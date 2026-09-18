@@ -9,17 +9,17 @@ No public-sales readiness claim is made. These checks must be completed before e
 - [ ] Prove the implemented DB-shared limiter and trusted proxy/client-IP handling on the actual multi-instance staging deployment.
 - [ ] Stripe sandbox renewal, delayed payment, changed plan, cancellation, taxes/invoices, failed payment, duplicate/out-of-order delivery and reconciliation. The local mock is not this evidence.
 - [ ] Run the implemented numbered migration/checksum procedure against the new PostgreSQL target, including upgrade and backup/restore evidence.
-- [ ] Upload memory profile on an older device; 20 mixed large JPEG/PNG/WebP files and HEIC refusal. Browser reload currently clears the in-memory queue. Optional IndexedDB recovery is deferred and must not be advertised.
-- [ ] Full operator observability: alert delivery, request-to-job correlation, failure classification and costs/support per event. Current local counters are not a complete monitoring system.
+- [ ] Upload memory profile on an older device with 20 mixed large JPEG/PNG/WebP and HEIC/HEIF files. Verify bounded server conversion, explicit fallback errors and IndexedDB queue recovery after refresh without persisting guest tokens.
+- [ ] Validate alert webhook delivery, request-to-job correlation, failure classification and costs/support per event in staging. Structured logs, request IDs, health checks and alert hooks are implemented; provider dashboards still need target-environment evidence.
 - [ ] Capacity test for maximum advertised event/ZIP allowances. Tune batching, worker memory and lease behavior with measurements.
 - [ ] Independent security review: IDOR, XSS, CSRF, auth recovery, RLS/DB role, signed URL replay, malformed images, plan/owner bypass and admin authorization.
 - [ ] Actual database plus object backup/restore drill to an empty isolated environment, with checksums and sample ZIP verification.
-- [ ] Keyboard/screen-reader, contrast in both themes, 200% zoom and physical-device safe areas. Browser layout screenshots alone are insufficient.
+- [ ] Complete physical VoiceOver/NVDA and phone safe-area sign-off. Automated axe, keyboard entry, reduced motion, responsive viewports and 200% zoom checks already run in CI.
 
 ## Owner-dependent steps
 
 1. Select legal operator name, registration/contact details, service jurisdiction, customer market and support channel. No details have been invented.
-2. Check Gatherframe trademark/domain availability. Replace the provisional brand if necessary.
+2. Check Lumiq trademark/domain availability. Replace the provisional brand if necessary.
 3. Interview at least three target organizers. Compare occasional event passes with the current monthly test proposal; select one launch offer.
 4. Measure storage/operations/API hosting/email/payment fees and support time. Set prices and a contingency margin only after those inputs exist.
 5. Approve privacy notice, terms, refund/withdrawal rules, tax treatment, subprocessors, regions, retention, deletion/backup windows and rights-request process with qualified advice.

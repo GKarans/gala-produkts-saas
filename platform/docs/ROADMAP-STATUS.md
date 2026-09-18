@@ -13,7 +13,7 @@ LOCAL = implemented locally, with the evidence described in TESTING.md. PARTIAL 
 | A5 | LOCAL | Metadata-first deletion and durable cleanup, thumbnail repair and cover cleanup queue |
 | A6 | LOCAL | Fetch/XHR timeouts, remove/discard, authoritative end check; phone return behavior still manual |
 | A7 | PARTIAL | Read-only missing-object inspection and thumbnail-repair job. Legacy MVP/orphan bucket inventory intentionally untouched |
-| A8 | PARTIAL | Pinned dependencies, isolated test/build/browser command and manual-only CI workflow. Clean GitHub host and full legacy test suite not re-certified |
+| A8 | PARTIAL | Pinned dependencies, isolated check command, PR/main CI, CodeQL and test artifacts. First clean GitHub-hosted run and branch protection still require repository setup |
 | A9 | MANUAL | Physical Android/iPhone/older phone, ten consecutive captures |
 | B1 | LOCAL | Direct-manipulation guest editor without sliders, shared cover renderer, saved style/position tests; separate details/sharing |
 | B2, B3 | LOCAL | Local datetime + hidden IANA, UTC server boundaries, DST rejection tests; no MVP migration |
@@ -22,11 +22,11 @@ LOCAL = implemented locally, with the evidence described in TESTING.md. PARTIAL 
 | B7 | LOCAL | Draft/publish, description, duplicate and two cover starting points; no elaborate template editor |
 | C1, C2 | LOCAL | Camera/select, 20-photo bounded queue, two parallel uploads, progress/preview/retry |
 | C3 | LOCAL | Stable ID, bounded transient retry, no success before finalize |
-| C4 | PARTIAL | Single browser decode, resize/compression, explicit HEIC refusal; older-device memory evidence absent |
+| C4 | PARTIAL | Browser decode/resize plus authenticated bounded HEIC/HEIF conversion; older-device memory evidence absent |
 | C5 | LOCAL | Optimized WebP only, consistently described as optimized, not originals |
-| C6 | DEFERRED | Optional IndexedDB persistence. No universal background-upload claim |
+| C6 | LOCAL | Bounded IndexedDB source queue survives refresh without storing guest tokens. No universal background-upload claim |
 | C7 | MANUAL | Physical devices, network conditions and app-switch matrix |
-| D1 | LOCAL | DB pagination, stable timestamp/ID order, same-origin authorized media; offset pagination, not cursor |
+| D1 | LOCAL | Stable `(created_at,id)` cursor pagination, filters and same-origin authorized media |
 | D2 | LOCAL | Last updated, manual refresh and visible organizer polling; operating cost still to measure |
 | D3, D4 | LOCAL | Guest/date/order filters, preview arrows/swipe, selection/bulk delete, all/selected export |
 | D5 | LOCAL | Queued/processing/ready/failed jobs, retry, expiry and persisted files |
@@ -41,7 +41,7 @@ LOCAL = implemented locally, with the evidence described in TESTING.md. PARTIAL 
 | E5 | PARTIAL | Plan, used bytes/photo counts, granted retention and share allowance; customer cost study pending |
 | E6 | PARTIAL | Native dialogs/focus, labels, icon names, responsive layouts, reduced motion; independent accessibility/device review pending |
 | F1 | MANUAL | Customer interviews and paid pilot not performed. Monthly proposal is a reversible local hypothesis |
-| F2 | LOCAL | Explore trial, EUR 10 Single Event, Gathering four and Studio twelve new publications per paid period; bounded entitlement snapshots, no unlimited, teams or annual plans |
+| F2 | LOCAL | Explore trial, EUR 15 Single Event, EUR 25 Gathering with four and EUR 59 Studio with twelve new publications per paid period; bounded entitlement snapshots, no unlimited, teams or annual plans |
 | F3 | MANUAL | Actual cost and support measurements before price approval |
 | F4 | LOCAL / MANUAL | Simulated checkout, Stripe test adapter, verified webhook ledger; no live purchase |
 | F5 | PARTIAL | Canonical subscription reconciliation, duplicate/stale tests, failed/canceled outcomes. Real refund/invoice matrix pending |
@@ -56,7 +56,7 @@ LOCAL = implemented locally, with the evidence described in TESTING.md. PARTIAL 
 | H3 | PARTIAL | Isolated worktree, local-only defaults, blocked legacy deployment, staged adapters and build allowlist; actual staging/CI/rollback drill pending |
 | H4 | LOCAL / MANUAL | Direct service/API integration tests with local PostgreSQL engine; new Supabase/R2 target acceptance pending |
 | H5 | MANUAL | Local negative tests are not an independent security review |
-| H6 | PARTIAL | Request/job error IDs, counters and operations view; provider monitoring/alerts and full outcome telemetry pending |
+| H6 | PARTIAL | Structured logs, request IDs, database health, alert webhook and operations counters; provider dashboards and alert-delivery drill pending |
 | H7, H8 | MANUAL | Backup/restore and load-test procedures documented; real cloud recovery/maximum-size tests not performed |
 | H9 | PARTIAL | Admin role, customers/jobs/support/email/audit/usage, retry and reconciliation API; refund approval and controlled allowance tools not complete |
 | H10 | DEFERRED | No teams offered; no unnecessary memberships model |

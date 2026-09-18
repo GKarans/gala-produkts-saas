@@ -1,0 +1,60 @@
+services:
+  - type: web
+    name: lumiq-staging-web
+    runtime: node
+    plan: starter
+    buildCommand: npm ci --ignore-scripts && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeployTrigger: checksPass
+    envVars: &lumiqEnv
+      - key: NODE_VERSION
+        value: 22
+      - key: PLATFORM_MODE
+        value: staging
+      - key: PLATFORM_RELEASE_APPROVED
+        value: staging
+      - key: PLATFORM_ORIGIN
+        sync: false
+      - key: PLATFORM_DATABASE_URL
+        sync: false
+      - key: PLATFORM_SUPABASE_URL
+        sync: false
+      - key: PLATFORM_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: PLATFORM_SESSION_ENCRYPTION_KEY
+        generateValue: true
+      - key: PLATFORM_R2_BUCKET
+        sync: false
+      - key: PLATFORM_R2_ENDPOINT
+        sync: false
+      - key: PLATFORM_R2_ACCESS_KEY_ID
+        sync: false
+      - key: PLATFORM_R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: PLATFORM_TRUSTED_PROXY_IPS
+        sync: false
+      - key: PLATFORM_STRIPE_SECRET
+        sync: false
+      - key: PLATFORM_STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: PLATFORM_STRIPE_PRICE_SINGLE
+        sync: false
+      - key: PLATFORM_STRIPE_PRICE_GATHERING
+        sync: false
+      - key: PLATFORM_STRIPE_PRICE_STUDIO
+        sync: false
+      - key: PLATFORM_EMAIL_KEY
+        sync: false
+      - key: PLATFORM_EMAIL_FROM
+        sync: false
+      - key: PLATFORM_ALERT_WEBHOOK
+        sync: false
+  - type: worker
+    name: lumiq-staging-worker
+    runtime: node
+    plan: starter
+    buildCommand: npm ci --ignore-scripts && npm run build
+    startCommand: npm run worker
+    autoDeployTrigger: checksPass
+    envVars: *lumiqEnv

@@ -1,16 +1,40 @@
-import {zipSync,strToU8} from 'fflate';
+import {PassThrough} from 'node:stream';
+import {Zip,ZipPassThrough,strToU8} from 'fflate';
 import {uuid,requireThat,hash} from './security.mjs';
 import sharp from 'sharp';
 import {collectNotices} from './notifications.mjs';
+import {localized} from './locale.mjs';
+import {sendAlert} from './alerts.mjs';
 export function jobService(db,files,mail){
  let running=false;
  const queue=async(owner,event,type,payload={})=>{const id=uuid();await db.query('insert into jobs(id,owner_id,event_id,type,payload) values($1,$2,$3,$4,$5)',[id,owner,event,type,JSON.stringify(payload)]);return{id};};
  const exportJob=async job=>{
   const items=(await db.query("select m.*,g.name as guest from media m join guests g on g.id=m.guest_id where m.event_id=$1 and m.id=any($2::uuid[]) and m.status='uploaded' order by m.created_at,m.id",[job.event_id,job.payload.ids])).rows;
   requireThat(items.length===job.payload.ids.length,409,'Photos changed after this export was requested. Create a new export.');
-  const parts=[];let batch={},bytes=0,index=0,manifest=[];
-  const flush=async()=>{if(!Object.keys(batch).length)return;batch['manifest.json']=strToU8(JSON.stringify(manifest,null,2));const zip=zipSync(batch,{level:0});const key=`exports/${job.event_id}/${job.id}/part-${++index}.zip`;await files.put(key,zip,'application/zip');parts.push({key,name:`event-photos-${index}.zip`,bytes:zip.length,count:manifest.length});await db.query('update jobs set result=$1 where id=$2',[JSON.stringify({parts,partial:true}),job.id]);batch={};manifest=[];bytes=0;};
-  for(const m of items){await db.query("update jobs set lease_until=now()+interval '10 minutes' where id=$1",[job.id]);if(bytes+Number(m.bytes)>64*1024**2)await flush();const data=await files.get(m.object_key);batch[`${m.guest.replace(/[^\p{L}\p{N}_-]/gu,'_').slice(0,60)}-${m.id}.webp`]=data;bytes+=data.length;manifest.push({id:m.id,photographer:m.guest,captured:m.created_at,format:'optimized WebP'});}
+  const parts=[];let batch=[],bytes=0,index=0;
+  const flush=async()=>{
+   if(!batch.length)return;
+   const key=`exports/${job.event_id}/${job.id}/part-${++index}.zip`,output=new PassThrough({highWaterMark:1024*1024});
+   let archiveBytes=0;
+   const finished=new Promise((resolve,reject)=>{
+    const zip=new Zip((error,chunk,final)=>{
+     if(error){output.destroy(error);reject(error);return;}
+     archiveBytes+=chunk.length;output.write(Buffer.from(chunk));
+     if(final){output.end();resolve();}
+    });
+    (async()=>{
+     try{
+      for(const item of batch){const entry=new ZipPassThrough(item.name);zip.add(entry);entry.push(await files.get(item.object_key),true);}
+      const manifest=new ZipPassThrough('manifest.json');zip.add(manifest);manifest.push(strToU8(JSON.stringify(batch.map(({id,photographer,captured})=>({id,photographer,captured,format:'optimized WebP'})),null,2)),true);zip.end();
+     }catch(error){zip.terminate();output.destroy(error);reject(error);}
+    })();
+   });
+   await Promise.all([files.putStream(key,output,'application/zip'),finished]);
+   parts.push({key,name:`event-photos-${index}.zip`,bytes:archiveBytes,count:batch.length});
+   await db.query('update jobs set result=$1 where id=$2',[JSON.stringify({parts,partial:true}),job.id]);
+   batch=[];bytes=0;
+  };
+  for(const m of items){await db.query("update jobs set lease_until=now()+interval '10 minutes' where id=$1",[job.id]);if(batch.length&&bytes+Number(m.bytes)>64*1024**2)await flush();batch.push({id:m.id,photographer:m.guest,captured:m.created_at,object_key:m.object_key,name:`${m.guest.replace(/[^\p{L}\p{N}_-]/gu,'_').slice(0,60)}-${m.id}.webp`});bytes+=Number(m.bytes);}
   await flush();return{parts,count:items.length,expires_at:new Date(Date.now()+7*86400000).toISOString()};
  };
  const cleanup=async job=>{
@@ -33,8 +57,8 @@ export function jobService(db,files,mail){
   async tick(){if(running)return;running=true;try{
    await db.query("update jobs set status='queued' where status='processing' and lease_until<now()");
    const job=await db.transaction(async tx=>{const j=(await tx.query("select * from jobs where status='queued' and available_at<=now() order by created_at for update skip locked limit 1")).rows[0];if(j)await tx.query("update jobs set status='processing',attempts=attempts+1,lease_until=now()+interval '10 minutes' where id=$1",[j.id]);return j;});if(!job)return;
-   try{const result=job.type==='export'?await exportJob(job):await cleanup(job);await db.query("update jobs set status='ready',result=$1,updated_at=now(),error=null where id=$2",[JSON.stringify(result),job.id]);const account=(await db.query('select * from accounts where id=$1',[job.owner_id])).rows[0];if(account&&job.type==='export')await mail(account,'Your photo export is ready','Your optimized photo archive is ready in your event workspace.',`export:${job.id}`);}
-   catch(error){const retry=job.attempts<2;await db.query('update jobs set status=$1,error=$2,available_at=now()+interval \'30 seconds\',updated_at=now() where id=$3',[retry?'queued':'failed','This job could not finish. Your photos remain available. Retry or contact support.',job.id]);console.error(JSON.stringify({job:job.id,type:job.type,error:error.status||'processing-failed'}));}
+   try{const result=job.type==='export'?await exportJob(job):await cleanup(job);await db.query("update jobs set status='ready',result=$1,updated_at=now(),error=null where id=$2",[JSON.stringify(result),job.id]);const account=(await db.query('select * from accounts where id=$1',[job.owner_id])).rows[0];if(account&&job.type==='export')await mail(account,localized(account,'Your photo export is ready','Tavs foto eksports ir gatavs'),localized(account,'Your optimized photo archive is ready in your event workspace.','Optimizēto foto arhīvs ir gatavs pasākuma darba vietā.'),`export:${job.id}`);}
+   catch(error){const retry=job.attempts<2;await db.query('update jobs set status=$1,error=$2,available_at=now()+interval \'30 seconds\',updated_at=now() where id=$3',[retry?'queued':'failed','This job could not finish. Your photos remain available. Retry or contact support.',job.id]);console.error(JSON.stringify({level:'error',component:'jobs',job:job.id,type:job.type,error:error.status||'processing-failed'}));if(!retry)await sendAlert('background-job-failed',{job:job.id,type:job.type}).catch(alertError=>console.error(JSON.stringify({level:'error',component:'alerts',error:alertError.message})));}
   }finally{running=false;}},
   async retention(){await collectNotices(db);await db.query('delete from request_limits where expires_at<now()');
    const pending=(await db.query("select m.id,m.event_id,e.owner_id from media m join events e on e.id=m.event_id where m.status='pending' and m.created_at<now()-interval '24 hours'")).rows;
@@ -42,6 +66,6 @@ export function jobService(db,files,mail){
    const expired=(await db.query("select * from jobs where type='export' and status='ready' and result->>'expires_at' is not null and (result->>'expires_at')::timestamptz<=now() and not (result ? 'cleaned')")).rows;
    for(const j of expired)await db.transaction(async tx=>{await tx.query("insert into jobs(id,owner_id,event_id,type,payload) values($1,$2,$3,'object-cleanup',$4)",[uuid(),j.owner_id,j.event_id,JSON.stringify({keys:(j.result.parts||[]).map(p=>p.key)})]);await tx.query("update jobs set result=result||'{\"cleaned\":true}'::jsonb where id=$1",[j.id]);});
    await db.query("update subscriptions set status='ended' where period_end<=now() and (cancel_at_end=true or plan='trial')");
-   const rows=(await db.query("select e.* from events e where e.retention_at<=now() and e.status<>'deleted' and not exists(select 1 from jobs j where j.event_id=e.id and j.type='cleanup' and j.status in ('queued','processing'))")).rows;for(const e of rows)await queue(e.owner_id,e.id,'cleanup');const remind=(await db.query("select e.*,a.email,a.name as account_name from events e join accounts a on a.id=e.owner_id where e.retention_at between now() and now()+interval '7 days' and e.status<>'deleted'")).rows;for(const e of remind)await mail({id:e.owner_id,email:e.email},'Your photo retention period is ending',`${e.name}: download your photos before ${new Date(e.retention_at).toISOString().slice(0,10)}.`,`retention:${e.id}:${e.retention_at}`);await db.query("delete from sessions where expires_at<now();").catch(()=>{});}
+   const rows=(await db.query("select e.* from events e where e.retention_at<=now() and e.status<>'deleted' and not exists(select 1 from jobs j where j.event_id=e.id and j.type='cleanup' and j.status in ('queued','processing'))")).rows;for(const e of rows)await queue(e.owner_id,e.id,'cleanup');const remind=(await db.query("select e.*,a.email,a.name as account_name,a.preferences from events e join accounts a on a.id=e.owner_id where e.retention_at between now() and now()+interval '7 days' and e.status<>'deleted'")).rows;for(const e of remind){const account={id:e.owner_id,email:e.email,preferences:e.preferences};await mail(account,localized(account,'Your photo retention period is ending','Foto glabāšanas periods drīz beigsies'),localized(account,`${e.name}: download your photos before ${new Date(e.retention_at).toISOString().slice(0,10)}.`,`${e.name}: lejupielādē foto līdz ${new Date(e.retention_at).toISOString().slice(0,10)}.`),`retention:${e.id}:${e.retention_at}`);}await db.query("delete from sessions where expires_at<now();").catch(()=>{});}
  };
 }

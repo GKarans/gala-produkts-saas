@@ -7,27 +7,27 @@ Scope: new `platform/` product only. This is not a re-certification of the origi
 ## Repeatable commands
 
 ```powershell
-npm run platform:test
-npm run platform:build
-npm run platform:browser
+npm test
+npm run build
+npm run browser
 ```
 
-`npm run platform:check` runs all three. Browser verification starts a temporary loopback server on a free port, uses an in-memory database and temporary objects, and stops the process afterward. The existing preview on port 5700 is not used or reset.
+`npm run check` runs secret/dependency security checks, backend tests, build validation and the browser suite. Browser verification starts a temporary loopback server on a free port, uses an in-memory database and temporary objects, and stops the process afterward. The existing preview on port 5700 is not used or reset.
 
-Existing preview checks can also run individually with `npm run platform:ui`, `node platform/tests/journey.cjs`, and `node platform/tests/designer.cjs`; these create test records in that local preview. Prefer the isolated combined command.
+Use `npm run browser` for the complete isolated Chromium suite. Prefer `npm run check` before every commit or pull request.
 
 ## Executed evidence
 
 | Area | Result | Evidence |
 | --- | --- | --- |
-| Backend integration and unit tests | PASS; 45 tests, zero failures on 2026-09-14 | `tests/*.test.mjs` |
+| Backend integration and unit tests | PASS; 51 tests, zero failures on 2026-09-18 | `tests/*.test.mjs` |
 | Public build boundary | PASS, public asset allowlist; no deployment | `scripts/build.mjs` |
 | Responsive browser checks | PASS at 320, 390, 768 and 1440px | `tests/browser.cjs` |
 | Customer journey | PASS, register/verify/login, draft/publish, 20 successful photos including transient retry | `tests/journey.cjs` |
 | Guest designer | PASS, no sliders, direct manipulation, text/style edits, save/reload, mobile and real guest output | `tests/designer.cjs` |
 | External browser requests in upload journey | None observed | Request assertion in journey test |
 | Cloud/provider deployment | NOT RUN | New resources intentionally absent |
-| Physical camera and Safari | NOT RUN | Chromium viewport testing is not a physical-device test |
+| Physical camera and Safari | NOT RUN for this product branch | Chromium viewport testing is not a physical-device test |
 
 Screenshots and `browser-report.json` are generated in `platform/test-results/` (ignored by Git). Images were visually reviewed for page framing, text overflow, controls and cover rendering. They are local evidence, not production screenshots.
 
@@ -38,9 +38,9 @@ Publication allowances verified: Explore once per account, Gathering four and St
 - Pricing actions aligned at 390/768/1100/1440px; equal heights and row positions asserted.
 - Shared viewer portrait/landscape frame and arrows remain fixed; backdrop and swipe tested.
 - Custom label/color saved and reloaded; five bundled covers decode successfully.
-- LV preference and translated pricing cards survive reload. Complete localization is still in progress.
+- LV preference and translated public, legal and workspace routes survive reload; customer-authored event content remains unchanged.
 - Local profile and password-change tests reject incorrect credentials and revoke all sessions/reset links.
-- Optional editorial treatment checked at mobile/desktop sizes; removing query returns to default.
+- Gathering-derived Lumiq public pages checked at mobile and desktop sizes.
 - Dependency installation audit reported zero vulnerabilities on 2026-09-14; not an independent penetration test.
 
 ## Backend coverage
@@ -56,7 +56,9 @@ Publication regression additions: two simultaneous requests for the last subscri
 - Cleanup: metadata-first deletion, abandoned reservations, delayed discard, retry after storage failure, thumbnail repair.
 - Cover: old file removed only after replacement attachment; failed attachment remains tracked for cleanup.
 - Billing: signed/expired/tampered webhook, duplicate and delayed delivery, canonical subscription state and correct customer portal identifier.
-- Auth adapter: provider access/refresh tokens encrypted in DB and absent from browser cookies.
+- Auth adapter: provider access/refresh tokens encrypted in DB and absent from browser cookies; Google PKCE parameters and tampered-state rejection.
+- Draft preview: 15-minute owner QR opens a read-only design and rejects guest actions.
+- Capacity: stable cursor traversal across a Studio-sized 1,000-photo dataset.
 - Limits: shared database allowance and spoofed forwarded-address rejection.
 - Migrations: fresh apply, idempotent rerun, checksum mismatch refusal and forward upgrade.
 - Mail: notice deduplication, backoff, crash lease recovery, stable provider idempotency key and failed final attempt.
@@ -82,7 +84,7 @@ Follow the exact physical-device script and target-environment gates in [LAUNCH-
 - Browser tests use tiny synthetic JPEGs. They do not establish 20 high-resolution camera photos on a low-memory phone.
 - R2 signatures and Supabase/Stripe adapters exist, but mocks/local files do not prove live provider behavior.
 - Prepared ZIPs are bounded in source-byte batches; maximum advertised capacity still needs measured CPU/memory testing.
-- Closing the guest tab clears its in-memory queue. No background or offline persistence guarantee is made.
+- Refresh restores bounded pending source photos from IndexedDB. Closing the browser still has no background-upload guarantee.
 - Read-time revocation cannot retract files already downloaded or response bytes already in flight.
 - No independent legal/security approval, real cloud backup restore, real feedback or paid pilot has occurred.
 

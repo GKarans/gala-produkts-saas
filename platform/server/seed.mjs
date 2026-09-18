@@ -4,7 +4,7 @@ import path from 'node:path';
 import {ROOT} from './db.mjs';
 import {uuid,hash,passwordHash} from './security.mjs';
 import {PLANS,folder} from '../shared/plans.js';
-export const DEMO_EMAIL='demo@gatherframe.local';
+export const DEMO_EMAIL='demo@lumiq.local';
 export const DEMO_PASSWORD='Local-demo-only-2026';
 export async function seedLocal(app){
  for(const name of ['garden-gathering','wedding-toast']){

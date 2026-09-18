@@ -91,11 +91,12 @@ Atseviska pilna rezerves kopija var gandriz dubultot foto glabatuvi.
 
 ## Ieteikums
 
-Gathering ietilpiba ir pietiekama optimizetam produktam. Studio 20 GiB * 12
-* 6 menesi ir 1440 GiB uz vienu pastavigi maksimalu klientu jeb ap $23.19
-R2 glabasana menesi pirms visa pare ja. EUR 49 nav garanteta pelna.
-Pirms cenu fiksesanas jaapsver mazak publikaciju, isaka glabasana vai
-augstaka Studio cena. Nerobezot jau apsolitas klientu tiesibas atpakalejosi.
+Gathering ietilpiba ir pietiekama optimizetam produktam. Studio maksimalais
+limits ir 7 GiB * 12 pasakumi katra perioda ar 60 dienu glabasanu. Vienmeriga
+maksimala lietojuma modelis dod aptuveni 168 GiB aktivu foto datu uz klientu,
+pirms eksporta arhiviem un rezerves kopijam. EUR 59 ir cenu hipoteze, nevis
+garanteta pelna. Pirms cenu fiksesanas jaizmera realais p50/p95 foto para
+izmers, R2 operacijas, eksporta darbs, maksajumu komisija un atbalsta laiks.
 
 Izmerit dazadu telefonu dienas/nakts/detalizetus kadrus, reportet p50/p95/p99
 pec tiesi browser optimize pl usmas. Mer it ari 20+ vienlaicigus upload,

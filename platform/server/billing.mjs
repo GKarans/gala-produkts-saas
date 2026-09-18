@@ -95,7 +95,7 @@ export function billingService(db,{local,origin,fetcher=fetch}) {
    if(local)return{url:`/checkout/${id}`,order:id,sandbox:true};
    const price=process.env[`PLATFORM_STRIPE_PRICE_${plan.id.toUpperCase()}`];requireThat(price,503,'This plan is not configured yet.');
    const oneTime=plan.billing==='one_time';
-   const session=await stripe('checkout/sessions',{mode:oneTime?'payment':'subscription','line_items[0][price]':price,'line_items[0][quantity]':'1',success_url:`${origin}/app/billing?checkout=returned`,cancel_url:`${origin}/app/billing`,'metadata[account_id]':user.id,'metadata[order_id]':id,...(oneTime?{}:{'subscription_data[metadata][account_id]':user.id}),client_reference_id:id,...(current.provider_customer?{customer:current.provider_customer}:{customer_email:user.email})},id);
+   const session=await stripe('checkout/sessions',{mode:oneTime?'payment':'subscription','line_items[0][price]':price,'line_items[0][quantity]':'1',success_url:`${origin}/app/billing?checkout=returned`,cancel_url:`${origin}/app/billing`,'metadata[account_id]':user.id,'metadata[order_id]':id,'billing_address_collection':'required','tax_id_collection[enabled]':'true','automatic_tax[enabled]':'true',...(oneTime?{}:{'subscription_data[metadata][account_id]':user.id}),client_reference_id:id,...(current.provider_customer?{customer:current.provider_customer}:{customer_email:user.email})},id);
    await db.query('update orders set provider_id=$1 where id=$2',[session.id,id]);
    return{url:session.url};
   },
