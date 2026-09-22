@@ -91,18 +91,12 @@ Neveidot maksajumus, apmaksatus abonementus vai resursus, pirms ipasnieks tos at
 8. Atver lapu un DevTools. Nedrikst but pieprasijumu uz MVP Supabase, Worker vai Netlify. Upload binarie PUT ir tikai jaunaja R2; lasisana ir caur platformas API.
 9. Netlify krediti netiek izmantoti lokalam build vai Node serverim. Root Netlify/Worker konfiguracija si kopija apzinati nobloketa.
 
-## 7. Stripe tikai testa rezima
+## 7. Maksajumi pagaidam izslegti
 
-1. Pakalpojuma aktivizesanu un komercnosacijumus vispirms apstiprina ipasnieks. Nekadi live maksajumi saja versija nav atlauti.
-2. Stripe sandbox izveido Gathering 25 EUR/month (4 jaunas publikacijas perioda), Studio 59 EUR/month (12) un Single Event 15 EUR ar one-time cenu. Explore paliek bezmaksas trial bez Stripe produkta. Nodokli un komercnosacijumi vel jaapstiprina pirms realas pardosanas.
-3. Saglaba price ID backend `PLATFORM_STRIPE_PRICE_GATHERING`, `PLATFORM_STRIPE_PRICE_STUDIO` un `PLATFORM_STRIPE_PRICE_SINGLE`. Single Event nedrikst izmantot recurring cenu.
-4. Backend iestati tikai `sk_test_...` atslegu. `sk_live_` kods noraida. Frontend nedrikst sanemt so atslegu.
-5. Pievieno jaunu test webhook uz `/api/billing/webhook`, API version `2025-04-30.basil`. Izvelies checkout completed/async succeeded/async failed, subscription created/updated/deleted, invoice paid/payment_failed.
-6. Endpointa Signing secret ieliec `PLATFORM_STRIPE_WEBHOOK_SECRET`.
-7. Billing portal test settings atlauj atcelsanu perioda beigas un testa planu mainu; parbaudi price allowlist. Automated promotion codes/tax/yearly plans saja piedavajuma nav ieslegti.
-8. Teste sekmes, atteikumu, atcelsanu, aizkavetu apmaksu, atkartotu un samainitas secibas webhook. Atgriesanas URL pats nekad nepieskir planu.
-9. Atver portalu: klienta reference ir `cus_...`, nevis `sub_...`. Pardevejot cenu vai planu, lieto atsevisku versetu planu, nevis klusi parraksti esosus entitlements.
-10. Refund reala nauda nav automatizeta. Atbalsta procedura ir RUNBOOKS.md; testa refund un invoice nodoklu/law parbaude vel ir release gate.
+1. `render.yaml` nepievieno Stripe mainigos un Render vidē neatstāj `PLATFORM_STRIPE_*` vērtības.
+2. Bez `PLATFORM_STRIPE_SECRET` konfigurācija ziņo, ka checkout ir izslēgts. Maksas plānu pogas ir atspējotas; serveris noraida tiešus checkout pieprasījumus, neveidojot pasūtījumu.
+3. Explore izmēģinājuma plāns un tā publikācijas limits turpina darboties. Maksājumu simulācija ir pieejama tikai lokālajā izstrādē, nevis pieslēgtajā domēnā.
+4. Stripe atslēgas, webhook, cenu ID, pirkuma izpildi un juridiski/nodokļu jautājumus konfigurē tikai atsevišķā, vēlāk apstiprinātā maksājumu palaišanā. Nekādā gadījumā neizmanto `sk_live_` šajā izvietojumā.
 
 ## 8. Servisa epasti
 

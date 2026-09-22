@@ -1,9 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
-  <title id="title">Lumiq</title>
-  <rect width="64" height="64" rx="14" fill="#101713"/>
-  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M18 15v27c0 5 3 8 8 8h20" stroke="#F7F8F2" stroke-width="7"/>
-    <path d="M25 24 36 18l11 7v13L36 45 25 38Z" stroke="#DDF36A" stroke-width="5"/>
-    <circle cx="36" cy="31.5" r="4.5" fill="#FF6B8B" stroke="none"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 608 708" role="img" aria-labelledby="title"><title id="title">Lumiq</title><image href="/assets/brand-mark.png" width="608" height="708"/></svg>

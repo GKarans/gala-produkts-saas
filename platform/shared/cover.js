@@ -1,6 +1,7 @@
+import {normalizeFont} from './fonts.js';
 const clamp=(value,min,max,fallback)=>{const n=Number(value);return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback;};
 export function normalizeCover(value={}){
- return{positionX:clamp(value.positionX,0,100,50),position:clamp(value.position,0,100,50),zoom:Math.round(clamp(value.zoom,1,3,1)*100)/100,align:['left','center','right'].includes(value.align)?value.align:'center',font:value.font==='sans'?'sans':'serif',buttonTheme:['white','forest','rose','custom'].includes(value.buttonTheme)?value.buttonTheme:'white',buttonColor:/^#[0-9a-f]{6}$/i.test(value.buttonColor||'')?value.buttonColor.toLowerCase():'#153e32'};
+ return{positionX:clamp(value.positionX,0,100,50),position:clamp(value.position,0,100,50),zoom:Math.round(clamp(value.zoom,1,3,1)*100)/100,align:['left','center','right'].includes(value.align)?value.align:'center',font:normalizeFont(value.font),buttonTheme:['white','forest','rose','custom'].includes(value.buttonTheme)?value.buttonTheme:'white',buttonColor:/^#[0-9a-f]{6}$/i.test(value.buttonColor||'')?value.buttonColor.toLowerCase():'#153e32'};
 }
 export function coverGeometry(width,height,imageWidth,imageHeight,value={}){
  const pose=normalizeCover(value),scale=Math.max(width/imageWidth,height/imageHeight)*pose.zoom;

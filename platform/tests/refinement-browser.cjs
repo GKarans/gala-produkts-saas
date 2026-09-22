@@ -25,19 +25,61 @@ if(!/^http:\/\/127\.0\.0\.1:\d+$/.test(base))throw Error('Local only');
  await page.locator('.photo-stage').evaluate(el=>{const a=new Touch({identifier:1,target:el,clientX:300,clientY:200}),b=new Touch({identifier:1,target:el,clientX:100,clientY:205});el.dispatchEvent(new TouchEvent('touchstart',{touches:[a]}));el.dispatchEvent(new TouchEvent('touchend',{changedTouches:[b]}));});
  await page.locator('.preview-image[alt="Photo by Landscape"]:visible').waitFor();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  await page.screenshot({path:'platform/test-results/refinement-viewer-mobile.png'});await page.keyboard.press('Escape');
- await page.goto(base+'/pricing');await page.getByLabel('Language').selectOption('lv');await page.waitForFunction(()=>document.documentElement.lang==='lv');await page.getByRole('link',{name:'Izvēlēties Gathering',exact:true}).waitFor();await page.reload();await page.getByRole('link',{name:'Izvēlēties Gathering',exact:true}).waitFor();await page.screenshot({path:'platform/test-results/refinement-pricing-lv.png',fullPage:true});await page.getByLabel('Valoda').selectOption('en');await page.waitForFunction(()=>document.documentElement.lang==='en');
+ await page.goto(base+'/pricing');await page.getByRole('button',{name:'Language',exact:true}).click();await page.getByRole('listbox',{name:'Language'}).getByRole('option',{name:'LV',exact:true}).click();await page.waitForFunction(()=>document.documentElement.lang==='lv');await page.getByRole('link',{name:'Izvēlēties Gathering',exact:true}).waitFor();await page.reload();await page.getByRole('link',{name:'Izvēlēties Gathering',exact:true}).waitFor();await page.screenshot({path:'platform/test-results/refinement-pricing-lv.png',fullPage:true});await page.getByRole('button',{name:'Valoda',exact:true}).click();await page.getByRole('listbox',{name:'Valoda'}).getByRole('option',{name:'EN',exact:true}).click();await page.waitForFunction(()=>document.documentElement.lang==='en');
  await page.goto(base+'/');await page.getByRole('heading',{name:'Lumiq',exact:true}).waitFor();for(const width of [1440,390]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:`platform/test-results/gathering-home-${width}.png`,fullPage:true});}
- await page.getByLabel('Language').selectOption('lv');await page.getByRole('link',{name:'Izveidot pirmo pasākumu',exact:true}).waitFor();
+ await page.getByRole('button',{name:'Language',exact:true}).click();await page.getByRole('listbox',{name:'Language'}).getByRole('option',{name:'LV',exact:true}).click();await page.getByRole('link',{name:'Izveidot pirmo pasākumu',exact:true}).waitFor();
  assert(!(await page.locator('.hero').innerText()).includes('Your people.'));
  await page.screenshot({path:'platform/test-results/home-lv.png',fullPage:true});
  await page.goto(base+'/help');await page.getByText('Vai viesiem vajag lietotni vai kontu?',{exact:true}).waitFor();
  await page.goto(base+'/features');
  await page.getByText('Saglabā kontroli',{exact:true}).waitFor();
- await page.goto(base+'/privacy');await page.getByRole('heading',{name:'Privātuma politika',exact:true}).waitFor();await page.getByRole('heading',{name:'Kas ir atbildīgs',exact:true}).waitFor();const privacy=await page.locator('main').innerText();for(const phrase of ['The event organizer decides','Depending on applicable law','The account service is intended','In this preview'])assert(!privacy.includes(phrase));
+ await page.goto(base+'/privacy');await page.getByRole('heading',{name:'Privātuma politika',exact:true}).waitFor();await page.getByRole('heading',{name:'Kas nosaka pasākuma foto izmantošanu',exact:true}).waitFor();const privacy=await page.locator('main').innerText();for(const phrase of ['The event organizer chooses','People may have rights','The account service is intended','In this local preview','PRE-LAUNCH TEMPLATE'])assert(!privacy.includes(phrase));
+ for(const [path,phrases] of [['/terms',['Working product name:','The local checkout is a simulation','Where consumer distance-contract rules apply','PRE-LAUNCH TEMPLATE']],['/refunds',['No real payment or refund','Cancellation should stop the next renewal','PRE-LAUNCH TEMPLATE']]]){await page.goto(base+path);const text=await page.locator('main').innerText();for(const phrase of phrases)assert(!text.includes(phrase),`${path} still contains: ${phrase}`);}
  await page.goto(base+'/security');await page.getByRole('heading',{name:'Radīts privātiem pasākumiem.',exact:true}).waitFor();assert(!(await page.locator('main').innerText()).includes('Organizers can access'));
  await page.goto(base+'/login');await page.getByRole('button',{name:'G Ienākt ar Google',exact:true}).waitFor();
  await page.goto(base+'/sample-workspace');await page.getByText('Mani pasākumi',{exact:true}).first().waitFor();const workspace=await page.locator('.workspace').innerText();for(const phrase of ['Organizer workspace','Every gathering, in one place.','Ready in four small steps.'])assert(!workspace.includes(phrase));await page.screenshot({path:'platform/test-results/workspace-lv.png',fullPage:true});
- await page.locator('.event-row').first().getByRole('link',{name:'Atvērt',exact:true}).click();await page.getByRole('button',{name:'Drukāt vai lejupielādēt QR kodu'}).click();await page.getByText('Dārza svinības',{exact:true}).waitFor();await page.getByText('Vintage ielūgums',{exact:true}).click();assert((await page.locator('[data-qr-download="a5"]').getAttribute('href')).includes('template=vintage'));await page.getByRole('link',{name:'Atvērt Canva'}).waitFor();await page.screenshot({path:'platform/test-results/qr-builder-lv.png'});await page.getByRole('button',{name:'Aizvērt logu'}).click();
+ await page.locator('.event-row').filter({hasText:'Studio evening'}).getByRole('link',{name:'Atvērt',exact:true}).click();
+ const eventPath=new URL(page.url()).pathname;
+ await page.getByRole('button',{name:'Drukāt vai lejupielādēt QR kodu'}).click();
+ await page.getByText('Dārza svinības',{exact:true}).waitFor();
+ await page.getByText('Vintage ielūgums',{exact:true}).click();
+ const fontSelect=page.locator('#qr-font');
+ assert.equal(await fontSelect.locator('option').count(),10);
+ await page.getByRole('button',{name:'Fonts',exact:true}).click();
+ await page.getByRole('listbox',{name:'Fonts'}).getByRole('option',{name:'Roboto',exact:true}).click();
+ await page.getByRole('button',{name:'Fonts',exact:true}).click();
+ await page.getByRole('listbox',{name:'Fonts'}).getByRole('option',{name:'Playfair Display',exact:true}).click();
+ await page.getByLabel('Virsraksta izmērs').fill('88');
+ await page.getByRole('button',{name:'Liels',exact:true}).click();
+ await page.waitForFunction(()=>{const href=document.querySelector('#download-design')?.getAttribute('href')||'';return href.includes('format=table')&&href.includes('download=1')&&href.includes('template=vintage')&&href.includes('font=playfair-display')&&href.includes('titleSize=88');});
+ assert.equal(await page.getByRole('link',{name:'Lejupielādēt QR PNG'}).getAttribute('href').then(href=>href.includes('format=qr')&&href.includes('download=1')),true);
+ assert.equal(await page.getByText('Pārbaudīt priekšskatījumu',{exact:true}).count(),0);
+ assert.equal(await page.getByText('A5',{exact:true}).count(),0);
+ const handle=page.getByRole('button',{name:'Pārvietot QR kodu'}),before=await handle.boundingBox(),stage=await page.locator('#qr-stage').boundingBox();
+ await handle.dragTo(page.locator('#qr-stage'),{targetPosition:{x:stage.width*.68,y:stage.height*.68}});
+ const after=await handle.boundingBox();
+ assert(after.x>before.x);
+ await page.getByRole('button',{name:'Saglabāt dizainu'}).click();
+ await page.getByText('QR dizains saglabāts.').waitFor();
+ await page.getByRole('button',{name:'Drukāt dizainu'}).waitFor();
+ await page.getByRole('link',{name:'Atvērt Canva'}).waitFor();
+ await page.getByText('Lumiq augšupielādētajam dizainam neko nepievienos un nepārvietos.',{exact:false}).waitFor();
+ await page.screenshot({path:'platform/test-results/qr-builder-lv.png'});
+ await page.getByRole('button',{name:'Aizvērt logu'}).click();
+ const untranslated={
+  design:['Guest page','Save guest page','Cover collection','Current photo','Replace photo','Button color','Welcome','Camera'],
+  sharing:['Guests use the same event link','Photo and gallery requests','Up to 60 days'],
+  settings:['Photos remain available until','Archiving does not extend','Move it out of your main event list','Access is removed immediately'],
+  billing:['Current period ends','Published events keep','A draft is free to prepare'],
+  account:['Request a review of your account'],
+  admin:['Local service health','Accounts','Failed jobs','Open cases','Audit entries','Support cases','Background jobs','Recent service emails','Usage measurements','Audit trail','Attempt 0']
+ };
+ for(const tab of ['design','sharing','settings']){
+  await page.goto(base+eventPath+`?tab=${tab}`);await page.locator('main').waitFor();const content=await page.locator('main').innerText();for(const phrase of untranslated[tab])assert(!content.includes(phrase),`${tab} still contains: ${phrase}`);
+ }
+ for(const section of ['billing','account','admin']){
+  await page.goto(base+`/app/${section}`);await page.locator('main').waitFor();const content=await page.locator('main').innerText();for(const phrase of untranslated[section])assert(!content.includes(phrase),`${section} still contains: ${phrase}`);
+ }
  const covers=['garden-gathering','wedding-toast','party','coastal-celebration','city-rooftop'];for(const c of covers){const r=await page.request.get(base+'/assets/'+c+'.webp');assert(r.ok());assert((await sharp(await r.body()).metadata()).width>300);}
  assert.deepEqual(errors,[]);console.log('Refinement browser passed: aligned pricing, fixed viewer, backdrop, swipe and five bundled covers.');
 }finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

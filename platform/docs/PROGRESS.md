@@ -30,7 +30,7 @@ The original [roadmap](PRODUCT-ROADMAP.md) is preserved; the full ID mapping is 
 - [x] Publication regression: concurrent requests cannot consume the last subscription slot or one-time pass twice; another account cannot use the buyer's pass. Verified with isolated local database tests.
 - [x] Restoring an ended, never-published draft no longer makes it public. Restoring does not grant a publication allowance.
 - [x] Local payment simulation and test-only Stripe adapter with webhook signature/replay/order handling tests.
-- [x] Explore trial retained; Single Event EUR 15 one-time pass; Gathering EUR 25/month with four new publications per paid period; Studio EUR 59/month with twelve. Server-side publication ledger prevents recycling consumed slots through completion or deletion. See PRICING.md.
+- [x] Explore trial retained; Single Event EUR 15 one-time pass; Gathering EUR 30/month with four new publications per paid period; Studio EUR 70/month with twelve. Server-side publication ledger prevents recycling consumed slots through completion or deletion. See PRICING.md.
 - [x] Encrypted Supabase Auth session adapter and private R2 signed-upload adapter, without live connections.
 - [x] Persistent rate limits shared across API processes and explicit trusted-proxy handling.
 - [x] Versioned migration ledger with checksum protection and a forward delivery-lease migration.
@@ -43,7 +43,7 @@ The original [roadmap](PRODUCT-ROADMAP.md) is preserved; the full ID mapping is 
 
 ## Interface refinement, 2026-09-14
 
-- [x] Pricing grid aligns card actions; Explore increased to 350 MiB for new grants, with both quota limits explained.
+- [x] Pricing grid uses approved Explore/Single/Gathering/Studio prices and limits; independent photo-count and MiB quotas are shown without implying a photo-size guarantee.
 - [x] Shared fixed-size photo viewer with on-image arrows, keyboard navigation, touch swipe and backdrop dismissal.
 - [x] Five bundled event covers; editable photo-selection label; arbitrary hex color picker with automatic contrasting text.
 - [x] Local registration/profile: separate names, optional normalized phone and country code, personal/business company name.

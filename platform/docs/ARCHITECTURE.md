@@ -10,7 +10,7 @@ Only `platform/public`, selected shared configuration and local Lucide assets ar
 
 Photo-only. No video, face recognition, automated photo editing, native applications, teams or claims of unlimited storage. Lumiq is a provisional name, not a cleared trademark. Marketing illustrations are fictional scenes, not customers or testimonials.
 
-The offered local pricing model is Explore, EUR 15 Single Event, EUR 25 Gathering and EUR 59 Studio. These remain test hypotheses, not a validated final tax-inclusive offer. Single Event serves occasional organizers without creating a subscription. Annual billing and team seats are intentionally not advertised.
+The current local pricing model is Explore, EUR 15 Single Event, EUR 30 Gathering and EUR 70 Studio. Limits are maintained in `shared/plans.js` and documented in `PRICING.md`. Prices remain subject to tax and commercial approval; no live provider prices are changed here. Single Event serves occasional organizers without creating a subscription. Annual billing and team seats are intentionally not advertised.
 
 ## Components
 

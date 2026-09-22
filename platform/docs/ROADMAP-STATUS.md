@@ -41,7 +41,7 @@ LOCAL = implemented locally, with the evidence described in TESTING.md. PARTIAL 
 | E5 | PARTIAL | Plan, used bytes/photo counts, granted retention and share allowance; customer cost study pending |
 | E6 | PARTIAL | Native dialogs/focus, labels, icon names, responsive layouts, reduced motion; independent accessibility/device review pending |
 | F1 | MANUAL | Customer interviews and paid pilot not performed. Monthly proposal is a reversible local hypothesis |
-| F2 | LOCAL | Explore trial, EUR 15 Single Event, EUR 25 Gathering with four and EUR 59 Studio with twelve new publications per paid period; bounded entitlement snapshots, no unlimited, teams or annual plans |
+| F2 | LOCAL | Explore trial, EUR 15 Single Event, EUR 30 Gathering with four and EUR 70 Studio with twelve new publications per paid period; bounded entitlement snapshots, no unlimited, teams or annual plans |
 | F3 | MANUAL | Actual cost and support measurements before price approval |
 | F4 | LOCAL / MANUAL | Simulated checkout, Stripe test adapter, verified webhook ledger; no live purchase |
 | F5 | PARTIAL | Canonical subscription reconciliation, duplicate/stale tests, failed/canceled outcomes. Real refund/invoice matrix pending |

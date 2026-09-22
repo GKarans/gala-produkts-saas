@@ -1,6 +1,6 @@
 # Foto ietilpiba un izmaksu scenariji
 
-Datums: 2026-09-14. Planos izmainas nav veiktas.
+Datums: 2026-09-22. Plānu limiti atbilst `shared/plans.js`.
 
 ## Parbaudita implementacija
 
@@ -14,14 +14,14 @@ Servera limiti: foto 6 MiB, siktels 1 MiB; abi skaitas pasakuma limita.
 
 | Plans | Foto | Kopapjoms | Videji uz foto ar siktelu |
 |---|---:|---:|---:|
-| Explore | 50 | 350 MiB | 7 MiB |
-| Single Event / Gathering | 1500 | 5 GiB | 3.413 MiB |
-| Studio | 5000 | 20 GiB | 4.096 MiB |
+| Explore | 50 | 300 MiB | 6 MiB |
+| Single Event / Gathering | 500 | 2000 MiB | 4 MiB |
+| Studio | 1000 | 4000 MiB | 4 MiB |
 
-Explore pietiek pat 50 maksimalajiem 6+1 MiB pariem. Maksas planos foto
-skaita sasniegsana nav garanteta: pie 7 MiB uz pari ietilpst tikai 731 vai
-2925 foto. 100 MiB izmaksatu 2 MiB videjo budzetu, nevis atbalstitu visus
-50 maksimalos failus. Pa esosais Explore limits ir 350 MiB.
+Planā norādītais foto skaits un MiB apjoms ir atsevišķi limiti vienam eventam;
+lietotājam tie ir skaidri jāparāda, neizsakot garantētu faila izmēru uz foto.
+Foto un sīktēli tiek skaitīti kopējā glabātuves apjomā. Izpildlaiks noraida
+augšupielādi, ja sasniegts foto skaita vai glabātuves limits.
 
 ## Modela pienemumi
 
@@ -91,12 +91,14 @@ Atseviska pilna rezerves kopija var gandriz dubultot foto glabatuvi.
 
 ## Ieteikums
 
-Gathering ietilpiba ir pietiekama optimizetam produktam. Studio maksimalais
-limits ir 7 GiB * 12 pasakumi katra perioda ar 60 dienu glabasanu. Vienmeriga
-maksimala lietojuma modelis dod aptuveni 168 GiB aktivu foto datu uz klientu,
-pirms eksporta arhiviem un rezerves kopijam. EUR 59 ir cenu hipoteze, nevis
-garanteta pelna. Pirms cenu fiksesanas jaizmera realais p50/p95 foto para
-izmers, R2 operacijas, eksporta darbs, maksajumu komisija un atbalsta laiks.
+Gathering ir 30 EUR menesi un dod 4 jaunus pasakumus perioda; Studio ir 70 EUR
+menesi un dod 12. Studio katrs pasakums var glabat 4000 MiB, foto 30 dienas.
+Vienmeriga maksimalas publicesanas modelis dod lidz 48 GiB jaunu foto kvotu
+uz Studio klientu apmaksata perioda, pirms eksporta arhiviem un rezerves kopijam.
+Šī ir jauno pasākumu piešķirtā kvota, nevis garantija par faktisko vidējo patēriņu.
+EUR 70 ir pirms-palaišanas cena, nevis garantēta peļņa. Pirms cenu fiksēšanas
+jāizmēra reālais p50/p95 foto pāra izmērs, R2 operācijas, eksporta darbs,
+maksājumu komisija un atbalsta laiks.
 
 Izmerit dazadu telefonu dienas/nakts/detalizetus kadrus, reportet p50/p95/p99
 pec tiesi browser optimize pl usmas. Mer it ari 20+ vienlaicigus upload,
