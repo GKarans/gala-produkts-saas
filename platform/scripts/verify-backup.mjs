@@ -1,0 +1,4 @@
+import {readFile,stat} from 'node:fs/promises';import {createReadStream} from 'node:fs';import {createHash} from 'node:crypto';import path from 'node:path';
+const root=path.resolve(process.argv[2]||'');if(!process.argv[2])throw new Error('Usage: node platform/scripts/verify-backup.mjs <backup-directory>');const manifest=JSON.parse(await readFile(path.join(root,'manifest.json'),'utf8'));await stat(path.join(root,'database.dump'));
+for(const object of manifest.objects){const hash=createHash('sha256');for await(const chunk of createReadStream(path.join(root,object.file)))hash.update(chunk);if(hash.digest('hex')!==object.sha256)throw new Error(`Checksum mismatch: ${object.key}`);}
+console.log(`Backup verified: database dump and ${manifest.objects.length} R2 objects. Restore into an empty isolated drill environment before approving production.`);

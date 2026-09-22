@@ -13,15 +13,20 @@
     "worker": "node platform/server/staging.mjs --worker",
     "test": "node --test platform/tests/*.test.mjs",
     "test:ui": "node platform/tests/browser.cjs",
-    "test:lumiq": "node platform/tests/lumiq-browser.cjs",
     "build": "node platform/scripts/build.mjs",
     "migrate": "node platform/scripts/migrate.mjs",
     "verify": "npm test && npm run build",
     "browser": "node platform/scripts/verify-browser.mjs",
-    "check": "npm run verify && npm run browser"
+    "security": "node platform/scripts/security-scan.mjs && npm audit --audit-level=high",
+    "backup": "node platform/scripts/backup-cloud.mjs",
+    "backup:verify": "node platform/scripts/verify-backup.mjs",
+    "restore:drill": "node platform/scripts/restore-drill.mjs",
+    "cost": "node platform/scripts/cost-model.mjs",
+    "check": "npm run security && npm run verify && npm run browser"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1131.0",
+    "@aws-sdk/lib-storage": "^3.1131.0",
     "@aws-sdk/s3-request-presigner": "3.1131.0",
     "@electric-sql/pglite": "0.5.8",
     "fflate": "0.8.3",
@@ -33,6 +38,7 @@
     "sharp": "0.35.4"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
     "acorn": "8.18.0",
     "playwright": "1.63.0"
   }

@@ -10,7 +10,7 @@ test('cover always fills the surface without stretching or empty borders',()=>{
 test('drag, bounds, saved focus and non-numeric settings are normalized',()=>{
  const p=normalizeCover({positionX:50,position:50,zoom:2});const g=coverGeometry(390,760,1600,900,p);
  assert(moveCover(p,g,100,50).positionX<50);assert.equal(moveCover(p,g,100000,100000).positionX,0);
- assert.deepEqual(normalizeCover({zoom:NaN,position:NaN,align:'unsafe',buttonTheme:'unsafe'}),{positionX:50,position:50,zoom:1,align:'center',font:'serif',buttonTheme:'white',buttonColor:'#153e32'});
+ assert.deepEqual(normalizeCover({zoom:NaN,position:NaN,align:'unsafe',buttonTheme:'unsafe'}),{positionX:50,position:50,zoom:1,align:'center',font:'roboto',buttonTheme:'white',buttonColor:'#153e32'});
  assert.equal(normalizeCover({zoom:100}).zoom,3);
 });
 test('custom colors reject injected CSS and choose readable black or white text',()=>{

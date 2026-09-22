@@ -11,7 +11,7 @@ Scope: local platform copy only. No scanning of the original Netlify, Supabase, 
 - Stolen sessions, password-reset links, accidental secrets in browser bundles and unfinished cleanup jobs.
 
 ## Repeatable local checks
-Run `npm run platform:check` in the isolated copy. The test server uses ephemeral data. Run `npm audit` separately and record the actual result.
+Run `npm run check` in the isolated copy. The test server uses ephemeral data; the command includes the repository secret scanner and `npm audit --audit-level=high`.
 
 | Control | Local evidence | Remaining |
 | --- | --- | --- |

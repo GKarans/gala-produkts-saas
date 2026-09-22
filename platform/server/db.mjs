@@ -21,12 +21,12 @@ export async function openDatabase(options={}) {
  }
  const db={query,transaction,close};
  const entries=[];
- for(const [version,file]of [['001-platform','schema.sql'],['002-delivery-leases','migrations/002-delivery-leases.sql'],['003-publication-allowances','migrations/003-publication-allowances.sql'],['004-account-profile','migrations/004-account-profile.sql']])entries.push({version,sql:await readFile(path.join(ROOT,'server',file),'utf8')});
+ for(const [version,file]of [['001-platform','schema.sql'],['002-delivery-leases','migrations/002-delivery-leases.sql'],['003-publication-allowances','migrations/003-publication-allowances.sql'],['004-account-profile','migrations/004-account-profile.sql'],['005-gallery-curation','migrations/005-gallery-curation.sql']])entries.push({version,sql:await readFile(path.join(ROOT,'server',file),'utf8')});
  // A single schema execution is valid in PostgreSQL and PGlite extended mode through transaction.
  if(!connection||process.env.PLATFORM_MIGRATE==='1')await migrate(db,entries,{local:!connection});
  else {
   const applied=(await db.query('select version from platform_migrations')).rows.map(r=>r.version);
-  if(entries.some(e=>!applied.includes(e.version)))throw new Error('Platform migrations are pending. Run platform:migrate before starting.');
+  if(entries.some(e=>!applied.includes(e.version)))throw new Error('Platform migrations are pending. Run npm run migrate before starting.');
  }
  return db;
 }

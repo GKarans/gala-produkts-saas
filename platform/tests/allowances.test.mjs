@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {openDatabase} from '../server/db.mjs';
 import {createApp} from '../server/app.mjs';
 import {billingService} from '../server/billing.mjs';
-import {PLANS} from '../shared/plans.js';
+import {PLANS,eventState} from '../shared/plans.js';
 import {uuid} from '../server/security.mjs';
 
 test('publication allowance and Single Event purchases',async t=>{
@@ -12,11 +12,23 @@ test('publication allowance and Single Event purchases',async t=>{
  const draft=(u)=>app.events.save(u,{name:'Future gathering',start:new Date(Date.now()+86400000).toISOString().slice(0,16),end:new Date(Date.now()+2*86400000).toISOString().slice(0,16),time_zone:'UTC'});
  const publish=(u,e,funding='plan')=>app.events.action(u,e.id,{action:'publish',funding});
  try{
+  await t.test('new plan limits and automatic expiry archive behavior',async()=>{
+   assert.deepEqual(['trial','single','gathering','studio'].map(id=>{const p=PLANS[id];return[p.price,p.photos,p.bytes/1024**2,p.durationDays,p.retentionDays,p.shareDays];}),[[0,50,300,1,7,4],[1500,500,2000,3,14,7],[3000,500,2000,3,14,7],[7000,1000,4000,3,30,14]]);
+   const u=await account('gathering'),e=await draft(u);await publish(u,e);
+   await db.query("update events set starts_at=now()-interval '2 hours',ends_at=now()-interval '1 hour',retention_at=now()-interval '1 second',share_enabled=true where id=$1",[e.id]);
+   const expired=await app.events.own(u,e.id);assert.equal(eventState(expired),'archived');
+   const listed=(await app.events.list(u)).find(row=>row.id===e.id);assert.equal(listed.state,'archived');assert.equal(listed.photo_count,0);assert.equal(Number(listed.bytes),0);
+   await assert.rejects(app.media.list(expired,new URLSearchParams(),{owner:true}),/Photo retention has ended/);
+   await assert.rejects(app.events.guest(e.slug),/Event not found/);
+   await app.jobs.retention();await app.jobs.tick();
+   assert.equal((await app.events.own(u,e.id)).status,'archived');
+   assert.equal((await db.query("select count(*)::int as n from jobs where event_id=$1 and type='retention-cleanup' and status='ready'",[e.id])).rows[0].n,1);
+  });
   await t.test('expired subscriptions preserve owner access and post-event sharing until retention ends',async()=>{
    for(const plan of ['gathering','studio']){
     const u=await account(plan),e=await draft(u);await publish(u,e);
     const published=await app.events.own(u,e.id);
-    assert.equal(published.entitlement.retentionDays,plan==='studio'?60:30);
+    assert.equal(published.entitlement.retentionDays,plan==='studio'?30:14);
     await db.query("update events set starts_at=now()-interval '2 hours',ends_at=now()-interval '1 hour',retention_at=now()+($2*interval '1 day') where id=$1",[e.id,published.entitlement.retentionDays]);
     await db.query("update subscriptions set status='canceled',period_end=now()-interval '1 day' where account_id=$1",[u.id]);
     const retained=await app.events.own(u,e.id);
@@ -28,6 +40,13 @@ test('publication allowance and Single Event purchases',async t=>{
     await db.query("update events set retention_at=now()-interval '1 second' where id=$1",[e.id]);
     await assert.rejects(app.events.guest(e.slug),/Event not found/);
    }
+  });
+  await t.test('sharing duration is user-selected but cannot pass the remaining retention deadline',async()=>{
+   const u=await account('gathering'),e=await draft(u);await publish(u,e);
+   await db.query("update events set starts_at=now()-interval '2 days',ends_at=now()-interval '1 day',retention_at=now()+interval '4 days 1 minute' where id=$1",[e.id]);
+   await assert.rejects(app.events.action(u,e.id,{action:'share',enabled:true,days:5}),/remaining photo-retention period/);
+   await app.events.action(u,e.id,{action:'share',enabled:true,days:4});
+   const shared=await app.events.own(u,e.id);assert(Date.parse(shared.share_expires)<=Date.parse(shared.retention_at));
   });
   await t.test('trial remains one free publication and deletion cannot recycle it',async()=>{
    assert.equal(PLANS.trial.price,0);const u=await account(),a=await draft(u),b=await draft(u);
@@ -87,7 +106,7 @@ test('publication allowance and Single Event purchases',async t=>{
    const u=await account();for(const outcome of ['fail','cancel']){const o=await app.billing.checkout(u,{plan:'single'});await app.billing.simulate(u,o.order,outcome);}
    assert.equal((await app.events.allowance(u)).passes,0);
    const e=await draft(u);await db.query("update events set ends_at=starts_at+interval '8 days' where id=$1",[e.id]);
-   await assert.rejects(publish(u,e),/up to 3 days/);assert.equal((await app.events.allowance(u)).remaining,1);
+   await assert.rejects(publish(u,e),/up to 1 day/);assert.equal((await app.events.allowance(u)).remaining,1);
   });
   await t.test('subscription plan changes in the same period cannot reset used publications',async()=>{
    const u=await account(),first=await app.billing.checkout(u,{plan:'gathering'});await app.billing.simulate(u,first.order,'success');

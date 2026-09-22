@@ -30,7 +30,7 @@ The original [roadmap](PRODUCT-ROADMAP.md) is preserved; the full ID mapping is 
 - [x] Publication regression: concurrent requests cannot consume the last subscription slot or one-time pass twice; another account cannot use the buyer's pass. Verified with isolated local database tests.
 - [x] Restoring an ended, never-published draft no longer makes it public. Restoring does not grant a publication allowance.
 - [x] Local payment simulation and test-only Stripe adapter with webhook signature/replay/order handling tests.
-- [x] Explore trial retained; Single Event EUR 10 one-time pass; Gathering EUR 19/month with four new publications per paid period; Studio EUR 49/month with twelve. Server-side publication ledger prevents recycling consumed slots through completion or deletion. See PRICING.md.
+- [x] Explore trial retained; Single Event EUR 15 one-time pass; Gathering EUR 30/month with four new publications per paid period; Studio EUR 70/month with twelve. Server-side publication ledger prevents recycling consumed slots through completion or deletion. See PRICING.md.
 - [x] Encrypted Supabase Auth session adapter and private R2 signed-upload adapter, without live connections.
 - [x] Persistent rate limits shared across API processes and explicit trusted-proxy handling.
 - [x] Versioned migration ledger with checksum protection and a forward delivery-lease migration.
@@ -38,19 +38,19 @@ The original [roadmap](PRODUCT-ROADMAP.md) is preserved; the full ID mapping is 
 - [x] Leased email delivery, bounded retries, provider idempotency keys and recoverable failure state.
 - [x] Support cases and replies; role-gated operations, jobs, service-mail status and audit trail.
 - [x] Repeatable local test/build commands and isolated browser verification that does not use preview data.
-- [x] Manual-only CI definition prepared locally; no GitHub run or deploy triggered.
+- [x] Pull-request and `main` CI plus CodeQL definitions prepared locally; GitHub branch protection remains an owner setting.
 - [x] New-service setup guide, release checklist, operator runbooks and testing evidence.
 
 ## Interface refinement, 2026-09-14
 
-- [x] Pricing grid aligns card actions; Explore increased to 350 MiB for new grants, with both quota limits explained.
+- [x] Pricing grid uses approved Explore/Single/Gathering/Studio prices and limits; independent photo-count and MiB quotas are shown without implying a photo-size guarantee.
 - [x] Shared fixed-size photo viewer with on-image arrows, keyboard navigation, touch swipe and backdrop dismissal.
 - [x] Five bundled event covers; editable photo-selection label; arbitrary hex color picker with automatic contrasting text.
 - [x] Local registration/profile: separate names, optional normalized phone and country code, personal/business company name.
 - [x] Local current-password-protected password change revokes all sessions and outstanding reset links.
-- [x] Optional, separately styled editorial preview without changing default product behavior.
-- [ ] Complete LV/EN translation. Preference, core navigation/forms, pricing cards and default guest actions implemented; prose/emails/error coverage remains.
-- [ ] Google sign-in implementation and later real OAuth setup.
+- [x] One supported Gathering-derived public design, consistently branded as Lumiq.
+- [x] LV/EN catalogs cover public, legal, workspace, account, guest, API-error and service-email surfaces; final native-speaker copy review remains a release check.
+- [x] Google sign-in uses PKCE and encrypted HttpOnly state; real Google/Supabase provider setup remains an owner staging step.
 
 Detailed request checklist: [PRODUCT-REFINEMENT.md](PRODUCT-REFINEMENT.md). Security scope and residual gates: [SECURITY-VERIFICATION.md](SECURITY-VERIFICATION.md).
 
@@ -67,7 +67,7 @@ Current repository-wide priorities: [Critical product audit, 2026-09-17](CRITICA
 - [ ] Full production monitoring and alerts, verified support delivery, refund/operator approvals.
 - [ ] Customer interviews, an independently completed journey, and an explicitly approved pilot.
 
-Optional team accounts, annual billing, moderation-before-publication and persistent offline upload are not advertised in this release. They remain deferred rather than disguised as completed work.
+Optional team accounts, annual billing and moderation-before-publication are not advertised in this release. Refresh recovery exists for pending photos, but universal background upload after the browser is closed is not claimed.
 
 ## Next sequence
 

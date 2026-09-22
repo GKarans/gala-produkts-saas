@@ -9,11 +9,11 @@ this audit.
 
 ## Baseline
 
-- 49 backend and integration tests pass.
+- 51 backend and integration tests pass.
 - The isolated browser suite passes at 320, 390, 768 and 1440 px.
 - Register, verification, login, event publication, 20-photo upload with retry,
   gallery, viewer, guest designer, billing simulation and pricing checks pass.
-- The public build contains 34 allowlisted files and no known MVP endpoint or
+- The public build contains 43 validated files and no known MVP endpoint or
   secret pattern.
 - `npm audit` reports zero known dependency vulnerabilities at this baseline.
 
@@ -23,11 +23,10 @@ This is a strong local baseline, not proof of production readiness.
 
 ### P0: settle the product and make the real system provable
 
-1. **Choose one product identity and apply it everywhere.** The operational app
-   is Gatherframe while `/lumiq.html` is a separate Lumiq concept. Decide the
-   final name after domain and trademark checks, then unify wordmark, metadata,
-   email sender, cookie prefix, object paths and customer-facing copy. Keep the
-   alternative theme behind one removable feature flag until accepted.
+1. **Choose one product identity and apply it everywhere.** The supported
+   product surface now uses the Gathering-derived design under the Lumiq name.
+   Confirm the final name after domain and trademark checks, then keep the
+   wordmark, metadata, email sender, cookie prefix, object paths and copy aligned.
 
 2. **Finish complete LV/EN localization.** Navigation and main marketing pages
    are translated, but workspace actions, validation errors, server responses,
@@ -53,8 +52,8 @@ This is a strong local baseline, not proof of production readiness.
 6. **Turn CI into a mandatory quality gate.** The workflow is manual-only. Run
    unit/integration/browser checks on pull requests and protected-branch pushes,
    add formatting/linting, dependency review, secret scanning, SQL migration
-   checks and artifact retention. Include the currently separate Lumiq WebGL
-   test in the normal suite.
+   checks and artifact retention. Keep the supported Gathering-derived Lumiq
+   interface in the normal responsive and accessibility suite.
 
 7. **Commission an independent security assessment.** Test IDOR, session theft,
    OAuth linking, CSRF, stored/reflected XSS, RLS and privileged-role boundaries,
@@ -67,11 +66,10 @@ This is a strong local baseline, not proof of production readiness.
    and sample ZIP manifests. Define RPO/RTO, backup retention, encryption,
    deletion behavior and a scheduled restore drill.
 
-9. **Load-test the maximum paid plan and stream exports.** ZIP generation uses
-   synchronous in-memory `zipSync` batches. Replace it with bounded streaming or
-   a measured worker strategy, then test simultaneous full Studio events,
-   gallery reads, signed uploads and export retries while recording memory,
-   CPU, latency and storage-operation cost.
+9. **Load-test the maximum paid plan and stream exports.** ZIP generation now
+   streams bounded parts through the worker and stable cursor tests traverse a
+   1,000-photo Studio gallery. The staging run must still test simultaneous
+   events, signed uploads and retries while recording memory, CPU and latency.
 
 10. **Add production observability and service objectives.** Introduce
     structured request/job correlation IDs, error reporting, queue depth and age,
@@ -80,10 +78,10 @@ This is a strong local baseline, not proof of production readiness.
 
 ### P1: remove user friction and make the code easier to evolve
 
-11. **Persist and resume the guest upload queue.** The current queue is lost on
-    refresh or app termination. Use bounded IndexedDB storage with explicit
-    consent, clear device-space limits, retry/discard controls and cleanup after
-    confirmed finalize. Never claim universal background upload on mobile.
+11. **Persist and resume the guest upload queue.** A bounded IndexedDB source
+    queue now survives refresh, supports retry/discard and cleans up after
+    finalize without storing guest tokens. Universal background upload after
+    the browser is closed is intentionally not claimed.
 
 12. **Handle iPhone HEIC/HEIF gracefully.** Today those files are refused.
     Evaluate a memory-bounded conversion path and preserve orientation; if a
@@ -103,8 +101,8 @@ This is a strong local baseline, not proof of production readiness.
 
 15. **Complete accessibility certification.** Run keyboard-only, screen-reader,
     focus-order, error-announcement, 200% zoom, contrast and reduced-motion tests
-    in both themes and languages. Verify touch target sizes and safe areas on
-    physical phones, including the 3D homepage fallback.
+   in both languages. Verify touch target sizes and safe areas on physical
+   phones using the supported Gathering-derived interface.
 
 16. **Build a first-event onboarding journey.** Replace the empty dashboard with
     a short progress path: create event, choose cover, set exact times, preview

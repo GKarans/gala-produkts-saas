@@ -1,62 +1,31 @@
-# Approved local pricing
+# Current plan configuration
 
-Approved 2026-09-14. Local only; no live billing prices or services changed.
+Prices and allowances are a local product configuration; no live billing price is changed by this document. Published event grants are snapshots, so a change to a plan does not shorten retention already promised to an event.
 
-| Plan | EUR | Publications | Photos/event | Retention after event | Sharing |
-|---|---:|---|---:|---:|---:|
-| Explore | 0 | 1/account | 50 | 14 days | up to 7 days |
-| Single Event | 15 once | 1 purchased pass | 500 | 30 days | up to 30 days |
-| Gathering | 25/month | 4/paid period | 500 | 30 days | up to 30 days |
-| Studio | 59/month | 12/paid period | 1000 | 60 days | up to 60 days |
+| Plan | Price | New publications | Photos/event | Storage/event | Event duration | Photo retention | Guest sharing |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Explore | Free trial | 1 | 50 | 300 MiB | 1 day / 24 hours | 7 days | Up to 4 days |
+| Single Event | EUR 15 once | 1 pass | 500 | 2000 MiB | Up to 3 days | 14 days | Up to 7 days |
+| Gathering | EUR 30/month | 4 per paid period | 500 | 2000 MiB | Up to 3 days | 14 days | Up to 7 days |
+| Studio | EUR 70/month | 12 per paid period | 1000 | 4000 MiB | Up to 3 days | 30 days | Up to 14 days |
 
-First publication consumes the allowance, including scheduled events. Drafts do
-not count. Ending, deleting or archiving does not restore a publication. No
-monthly rollover. Single Event does not create or replace a subscription.
-Four Single Events cost EUR 60, compared with EUR 25 for Gathering's four.
+The photo-count cap and total stored-byte cap are enforced independently. Stored bytes include the optimized WebP photo and its thumbnail, not the phone original. At the configured per-file maxima (6 MiB photo + 1 MiB thumbnail), the byte caps can hold fewer photos than the count caps; actual optimized files are usually smaller, but the product must not promise a fixed average size per photo.
 
-Existing published-event entitlement snapshots are preserved.
-Gallery access does not end with the subscription. Organizers retain access and
-can enable guest sharing for the event's remaining retention window after
-cancellation or expiry. Guests still require enabled sharing. The 30/60-day
-deadline runs from event end, not subscription end or the date sharing is enabled.
-New plan-funded publications require an eligible subscription.
-No database data
-was rewritten. Real payment-provider prices need separate staging configuration.
-Tax treatment and commercial release approval remain outstanding.
+The first publication consumes a plan slot, including a future scheduled event; drafts do not. Archiving/deleting does not return a slot and monthly slots do not roll over. Single Event purchases remain separate from subscriptions.
 
-Storage is included, not advertised as a rounded GB allowance. Internal capacity
-is exactly 7 MiB per allowed photo: 6 MiB photo plus 1 MiB thumbnail. This is
-350 / 3500 / 3500 / 7000 MiB by plan. Both byte and count reservations remain
-server-enforced. Originals are not stored; browser optimization uses WebP and
-2400 px longest edge. Source formats and size restrictions still apply.
+The retention period starts when the event/photo-taking period ends. Photo access ends at `retention_at`, calculated from the event end and the entitlement at publication. The organizer chooses a sharing duration up to the plan maximum and the remaining retention time; sharing begins after the event and cannot exceed `retention_at`. At expiry, organizer/guest photo access and sharing stop, the event is archived, and gallery files are deleted. Only the event name and record remain in Archive. Existing published events keep their granted retention deadline when plan settings later change.
 
-## Capacity planning
+## Capacity model
 
-Decimal TB; 30-day billing model, short events, uniform activity and timely
-deletion. All users publish and fill every event. The 1 MiB pair average is an
-assumption, not a measured customer average. Maximum uses 7 MiB pairs.
+For steady monthly publishing and evenly distributed activity, approximate active object storage as `organizers * events-per-period * min(photo-count * average-photo-pair-bytes, event-byte-cap) * retention-days / 30`. This excludes ZIP exports, backups, cleanup delay, and synchronized event peaks. MiB are binary (1024² bytes); TB in the following estimates are decimal.
 
-| Subscribers | Mix | At 1 MiB/pair | At maximum pair size |
-|---:|---|---:|---:|
-| 100 | 70% Gathering, 30% Studio | 0.902 TB | 6.312 TB |
-| 10000 | 70% Gathering, 30% Studio | 90.178 TB | 631.243 TB |
-| 100 | all Gathering | 0.210 TB | 1.468 TB |
-| 10000 | all Gathering | 20.972 TB | 146.801 TB |
-| 100 | all Studio | 2.517 TB | 17.616 TB |
-| 10000 | all Studio | 251.658 TB | 1761.608 TB |
+| Subscribers | Mix | Active photos, at full byte allowances |
+|---:|---|---:|
+| 100 | 70% Gathering / 30% Studio | 1.784 TB |
+| 10,000 | 70% Gathering / 30% Studio | 178.398 TB |
+| 100 | all Gathering | 0.391 TB |
+| 10,000 | all Gathering | 39.147 TB |
+| 100 | all Studio | 5.033 TB |
+| 10,000 | all Studio | 503.316 TB |
 
-Formula: users * events/period * photos/event * bytes/pair * retentionDays/30.
-Retention starts at event end; upload-window duration and synchronized events
-increase peak occupancy. These are steady-state estimates, not hard peak bounds.
-Add 30% operational headroom for an initial forecast, and model ZIP archives,
-backups, cleanup failures and bursty scheduling separately. R2 grows with use;
-no fixed-size disk purchase is needed. Budgets and alerts are still required.
-
-Single buyers are not in subscriber rows. 100 Single purchases once add at most
-0.367 TB; 10000 add 36.700 TB for their retention window, before overhead.
-
-Earlier CAPACITY-SCENARIOS.md describes superseded prices/limits for comparison.
-No profitability guarantee: include processing, API bandwidth, database, email,
-support, payment fees, tax, acquisition and free-account usage in the budget.
-The current private media route relays bytes through the API host; free R2 egress
-does not guarantee free API-host egress.
+These are upper-bound steady-state allowances, not storage purchase sizes. Add operational headroom, then separately model exports, backups, bursts and failed deletions. Measure actual p50/p95 photo-pair sizes before making commercial margin claims. Costs also include API compute/egress, database, email, payment fees, taxes and support; no profitability guarantee is implied.

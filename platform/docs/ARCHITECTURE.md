@@ -8,9 +8,9 @@ Only `platform/public`, selected shared configuration and local Lucide assets ar
 
 ## Product boundary
 
-Photo-only. No video, face recognition, automated photo editing, native applications, teams or claims of unlimited storage. Gatherframe is a provisional name, not a cleared trademark. Marketing illustrations are fictional scenes, not customers or testimonials.
+Photo-only. No video, face recognition, automated photo editing, native applications, teams or claims of unlimited storage. Lumiq is a provisional name, not a cleared trademark. Marketing illustrations are fictional scenes, not customers or testimonials.
 
-The offered local pricing model is monthly subscriptions for repeat organizers plus a small trial. EUR 19/49 are test hypotheses, not a validated price or final tax-inclusive offer. The source review also suggests per-event pricing for occasional users; test that hypothesis with organizers before commercial launch. Annual billing and team seats are intentionally not advertised.
+The current local pricing model is Explore, EUR 15 Single Event, EUR 30 Gathering and EUR 70 Studio. Limits are maintained in `shared/plans.js` and documented in `PRICING.md`. Prices remain subject to tax and commercial approval; no live provider prices are changed here. Single Event serves occasional organizers without creating a subscription. Annual billing and team seats are intentionally not advertised.
 
 ## Components
 
@@ -50,12 +50,12 @@ Retention is a database deadline. The worker processes it without requiring an o
 ## Upload protocol
 
 1. Guest receives a random token bound to one event. Names are attribution, not verified identity.
-2. Browser decodes JPEG/PNG/WebP once, respects orientation, resizes to a maximum dimension of 2400px and creates a 360px thumbnail. Only optimized WebP is retained. HEIC/HEIF is clearly rejected with a JPEG-export instruction.
+2. Browser decodes JPEG/PNG/WebP once, respects orientation, resizes to a maximum dimension of 2400px and creates a 360px thumbnail. Only optimized WebP is retained. Authenticated HEIC/HEIF sources use a bounded server conversion endpoint, with a precise JPEG fallback when conversion is unavailable.
 3. Source limit 30 MB, 60 MP after decoding, 20 selected photos, 150 MB source batch, two concurrent uploads. Optimized file limit 6 MiB; thumbnail limit 1 MiB. Real low-memory devices still require testing because decoding allocates memory before the pixel check.
 4. Stable UUID and checksums reserve bytes/photo allowance under an event DB lock. Prefixes use name snapshots plus IDs.
 5. Local: PUT to the local API. Staging: 5-minute checksum/length-bound signed PUT directly to R2. No secret is sent to the browser.
 6. Finalize verifies both files, hashes and actual decode. It marks a row uploaded only while the authoritative event is still open. Retrying an already completed photo is idempotent.
-7. Transient failures get at most two delayed foreground retries, then visible manual Retry. In-memory selections do not survive closing/reloading the tab. The UI warns about pending work; universal background upload is not claimed.
+7. Transient failures get at most two delayed foreground retries, then visible manual Retry. Pending source photos are bounded in IndexedDB and restored after refresh without persisting the guest token. Universal background upload after closing the browser is not claimed.
 8. Discard marks the reservation deleted. Cleanup waits past the signed-URL lifetime. Stale pending reservations expire after 24 hours.
 
 ## Reading, sharing and exports
@@ -68,8 +68,8 @@ Organizer Export all snapshots every matching uploaded ID across pages; Export s
 
 ## Deployment and release boundary
 
-`platform:build` packages only public files and checks for reference infrastructure/private files. It is not a static-only substitute for the Node API.
+`npm run build` validates only public files and checks for reference infrastructure/private files. It is not a static-only substitute for the Node API.
 
-The migration runner applies `001-platform` from `platform/server/schema.sql` and `002-delivery-leases`, `003-publication-allowances`, `004-account-profile` from `platform/server/migrations/`. A locked, checksummed ledger rejects changed applied SQL outside local development. API startup refuses missing versions. Further changes require forward entries and a backup/restore procedure. This does not migrate MVP data; real target PostgreSQL migration/restore acceptance remains pending.
+The migration runner applies `001-platform` from `platform/server/schema.sql` and numbered migrations through `005-gallery-curation` from `platform/server/migrations/`. A locked, checksummed ledger rejects changed applied SQL outside local development. API startup refuses missing versions. Further changes require forward entries and a backup/restore procedure. This does not migrate MVP data; real target PostgreSQL migration/restore acceptance remains pending.
 
 Production remains locked. See SETUP.md and LAUNCH-GATES.md. Local tests do not establish real Supabase/R2/Stripe compatibility, legal compliance, phone behavior or commercial viability.

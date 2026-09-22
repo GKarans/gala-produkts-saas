@@ -70,7 +70,7 @@ test('support replies and failed-email recovery require an audited administrator
    await db.query("insert into sessions(token_hash,account_id,expires_at) values($1,$2,now()+interval '1 hour')",[hash(id),id]);
   }
   await db.query('insert into support_cases(id,owner_id,email,subject,message) values($1,$2,$3,$4,$5)',[caseId,customer,'customer@example.test','Need help','Test question']);
-  const call=(who,route,body)=>app.handle(new Request(app.origin+'/api/'+route,{method:body?'POST':'GET',headers:{Origin:app.origin,Cookie:`gf_session=${who}`},...(body?{body:JSON.stringify(body)}:{})}));
+  const call=(who,route,body)=>app.handle(new Request(app.origin+'/api/'+route,{method:body?'POST':'GET',headers:{Origin:app.origin,Cookie:`lumiq_session=${who}`},...(body?{body:JSON.stringify(body)}:{})}));
   assert.equal((await call(customer,'admin/reply',{id:caseId,reply:'Not authorized'})).status,403);
   assert.equal((await call(admin,'admin/reply',{id:caseId,reply:'Here is your answer.'})).status,200);
   const delivery=(await db.query('select * from deliveries')).rows[0];assert.equal(delivery.body,'Here is your answer.');

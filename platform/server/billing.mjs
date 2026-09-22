@@ -89,13 +89,14 @@ export function billingService(db,{local,origin,fetcher=fetch}) {
   async reconcile(owner){requireThat(!local,409,'Local payments do not need reconciliation.');return db.transaction(async tx=>{const sub=(await tx.query('select * from subscriptions where account_id=$1 for update',[owner])).rows[0];requireThat(sub?.provider_id,404,'Subscription not found.');await canonical(tx,owner,sub.provider_id);return{ok:true};});},
   async checkout(user,input){
    const plan=PLANS[input.plan];requireThat(plan&&plan.price>0,400,'Choose a paid plan.');
+   if(!local)requireThat(process.env.PLATFORM_STRIPE_SECRET?.startsWith('sk_test_')&&process.env[`PLATFORM_STRIPE_PRICE_${plan.id.toUpperCase()}`],503,'Paid plans are not available yet.');
    const current=(await db.query('select * from subscriptions where account_id=$1',[user.id])).rows[0];
    requireThat(plan.billing==='one_time'||local||!current.provider_id||['ended','incomplete'].includes(current.status),409,'Manage your existing subscription in the billing portal.');
    const id=uuid();await db.query('insert into orders(id,owner_id,plan,amount) values($1,$2,$3,$4)',[id,user.id,plan.id,plan.price]);
    if(local)return{url:`/checkout/${id}`,order:id,sandbox:true};
    const price=process.env[`PLATFORM_STRIPE_PRICE_${plan.id.toUpperCase()}`];requireThat(price,503,'This plan is not configured yet.');
    const oneTime=plan.billing==='one_time';
-   const session=await stripe('checkout/sessions',{mode:oneTime?'payment':'subscription','line_items[0][price]':price,'line_items[0][quantity]':'1',success_url:`${origin}/app/billing?checkout=returned`,cancel_url:`${origin}/app/billing`,'metadata[account_id]':user.id,'metadata[order_id]':id,...(oneTime?{}:{'subscription_data[metadata][account_id]':user.id}),client_reference_id:id,...(current.provider_customer?{customer:current.provider_customer}:{customer_email:user.email})},id);
+   const session=await stripe('checkout/sessions',{mode:oneTime?'payment':'subscription','line_items[0][price]':price,'line_items[0][quantity]':'1',success_url:`${origin}/app/billing?checkout=returned`,cancel_url:`${origin}/app/billing`,'metadata[account_id]':user.id,'metadata[order_id]':id,'billing_address_collection':'required','tax_id_collection[enabled]':'true','automatic_tax[enabled]':'true',...(oneTime?{}:{'subscription_data[metadata][account_id]':user.id}),client_reference_id:id,...(current.provider_customer?{customer:current.provider_customer}:{customer_email:user.email})},id);
    await db.query('update orders set provider_id=$1 where id=$2',[session.id,id]);
    return{url:session.url};
   },
