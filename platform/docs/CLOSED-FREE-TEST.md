@@ -155,11 +155,15 @@ limit.
    tests on 2026-09-23. This is local adapter evidence only, not a live R2
    upload/read/delete integration check. This guard is now deployed in version
    `636cb1e2-2e0e-49d3-914e-47f335f0239f`. The owner has rechecked
-   authenticated health and basic event persistence. Cloud photo upload
-   remains closed until the test account's aggregate R2 usage is reviewed and
-   the owner explicitly starts a tiny synthetic upload test. Record provider
-   usage before and after it. Read-only Wrangler bucket info on 2026-09-23
-   showed `lumiq-closed-test-photos`: 0 objects / 0 B and
+   authenticated health and basic event persistence. The owner reviewed
+   account-level R2 usage and explicitly authorized one synthetic photo test.
+   A disposable event named `Synthetic R2 Upload Test 2026-09-23` was created
+   and published on 2026-09-23; publication consumed the sole remaining
+   Explore allowance. Its organizer gallery still reported 0 photos after a
+   refresh, so the guest photo flow is not verified. The test event is live
+   until 2026-09-24 00:15 Europe/Riga. Do not use `Balle` for the photo test.
+   Read-only Wrangler bucket info on 2026-09-23 initially showed
+   `lumiq-closed-test-photos`: 0 objects / 0 B and
    `lumiq-staging-photos`: 11 objects / 502 kB. These are per-bucket counts;
    they do not establish account-wide storage or Class A/B operation usage.
    The owner dashboard screenshot for `lumiq-closed-test-photos`, last 24 hours
@@ -182,7 +186,17 @@ limit.
    operations and request distribution 28. Its chart legends also showed 0,
    inconsistent with the summary cards. The account Overview is the
    account-level baseline for that billing period; per-bucket operation cards
-   remain provisional. No cloud photo upload has been performed.
+   remain provisional. A later read-only Wrangler check and Cloudflare
+   dashboard inspection on 2026-09-23 showed the test bucket now has 2 objects
+   / 144.71 kB. The object browser identifies both under the `Balle` event:
+   one WebP in `covers/` (45.6 kB, modified 23:21 Riga time) and one WebP in
+   `qr/` (99.06 kB, modified 23:20). These are saved design assets, not guest
+   photos; the dashboard showed no `photos/` objects, and both the `Balle` and
+   synthetic-test event galleries reported 0 photos. The latest account
+   Overview still shows 34.62 MB total storage and `$0.00` billable usage;
+   Class A rose from 378 to 388, while Class B remains 1.13k. No guest photo
+   upload has been completed or verified. Preserve the two Balle design
+   assets; do not delete them as part of the synthetic photo test.
 
 ## Not yet ready to deploy
 
@@ -198,9 +212,12 @@ limit.
   script's privilege checks. A separate Hyperdrive targets that role, and the
   owner-authenticated `/healthz` verified its query path. Do not point
   Hyperdrive at the `postgres` admin role.
-- A separate empty `lumiq-closed-test-photos` R2 bucket has been created and
-  verified in the authenticated Cloudflare account. No test objects have been
-  uploaded. The test Hyperdrive is configured with caching disabled and a
+- A separate `lumiq-closed-test-photos` R2 bucket has been created and verified
+  in the authenticated Cloudflare account. It now contains only two verified
+  Balle design objects (`covers/` and `qr/`); no guest photo is present. A
+  separate synthetic test event was published and consumed the sole remaining
+  Explore allowance, but its gallery remains at 0 photos. The test Hyperdrive
+  is configured with caching disabled and a
   five-connection origin limit. The ignored local Worker config binds it and
   the separate test bucket; Wrangler dry-run passed. The base Worker config is
   staging-only and must not be reused.
@@ -223,10 +240,11 @@ limit.
   and pass local tests; the guard is deployed in Worker version
   `636cb1e2-2e0e-49d3-914e-47f335f0239f`. Anonymous Access still blocks both
   `/` and `/healthz`. The owner confirmed authenticated health on that version.
-  Bucket-level stats on 2026-09-23 show the closed-test bucket is empty and
-  Lumiq staging has 11 objects / 502 kB; account-wide storage and operation
-  usage remain unverified. Inspect the Cloudflare account-level R2 usage before
-  any cloud photo test. No photo test has been run.
+  Account-level R2 usage has been rechecked: 34.62 MB total storage, `$0.00`
+  billable usage, 388 Class A and 1.13k Class B for the current billing period.
+  The test bucket has 2 design objects / 144.71 kB under Balle, not photos;
+  staging remains at 11 objects / 501.9 kB. The synthetic event is live but
+  still has 0 guest photos, so the authorized photo test is not complete.
 - A closed test does not satisfy the production release gates in
   `LAUNCH-GATES.md`; production still requires a separate owner approval and
   verified infrastructure, backup/restore, security, reliability and legal
