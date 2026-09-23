@@ -151,7 +151,9 @@ limit.
    no cloud photos. The Worker R2 adapter now has an app-side monthly operation
    ceiling and lifetime write-byte ceiling, including Class A object deletion;
    local tests cover concurrent reservations, normal photo/object paths and
-   bounded streaming exports. This guard is now deployed in version
+   bounded streaming exports. The focused Worker R2 adapter suite passed 5/5
+   tests on 2026-09-23. This is local adapter evidence only, not a live R2
+   upload/read/delete integration check. This guard is now deployed in version
    `636cb1e2-2e0e-49d3-914e-47f335f0239f`. The owner has rechecked
    authenticated health and basic event persistence. Cloud photo upload
    remains closed until the test account's aggregate R2 usage is reviewed and
@@ -165,6 +167,11 @@ limit.
    operations, 12 Class B operations and request distribution 9. This is a
    one-bucket 24-hour baseline only; it is not the account/month total and does
    not by itself authorize a photo upload.
+   A later owner screenshot for the same bucket with **Last 30 days** selected
+   showed average storage 0 B, data retrieved 0 B, 5 Class A operations,
+   15 Class B operations and request distribution 9. This remains per-bucket
+   data, not an account aggregate; the staging bucket and any other account
+   buckets still need review before the synthetic upload decision.
 
 ## Not yet ready to deploy
 
