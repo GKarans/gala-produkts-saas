@@ -165,16 +165,24 @@ limit.
    The owner dashboard screenshot for `lumiq-closed-test-photos`, last 24 hours
    on 2026-09-23, showed average storage 0 B, data retrieved 0 B, 3 Class A
    operations, 12 Class B operations and request distribution 9. This is a
-   one-bucket 24-hour baseline only; it is not the account/month total and does
-   not by itself authorize a photo upload.
+   one-bucket 24-hour baseline only, not the account/month total.
    A later owner screenshot for the same bucket with **Last 30 days** selected
    showed average storage 0 B, data retrieved 0 B, 5 Class A operations,
    15 Class B operations and request distribution 9. This remains per-bucket
-   data, not an account aggregate; the staging bucket and any other account
-   buckets still need review before the synthetic upload decision. The same
-   screenshot's Class A/B chart legends showed 0, conflicting with the summary
-   cards; treat those operation counts as provisional until reconciled with the
-   account usage view or analytics data.
+   data. The same screenshot's Class A/B chart legends showed 0, conflicting
+   with the summary cards; treat those operation counts as provisional until
+   reconciled.
+   The owner then provided the R2 account Overview screenshot for the current
+   billing period, 2026-09-12 through 2026-10-12: total storage 34.62 MB,
+   account Class A 378, Class B 1.13k, and billable usage `$0.00`. Its inventory
+   listed `app-images` 116 objects / 34.11 MB, `lumiq-closed-test-photos` 0 / 0,
+   `lumiq-staging-photos` 11 / 501.9 kB, and EU `lumiq-staging-photos` 0 / 0.
+   A separate Last 30 days screenshot for the staging bucket showed average
+   storage 501.9 kB, data retrieved 0 B, 48 Class A operations, 72 Class B
+   operations and request distribution 28. Its chart legends also showed 0,
+   inconsistent with the summary cards. The account Overview is the
+   account-level baseline for that billing period; per-bucket operation cards
+   remain provisional. No cloud photo upload has been performed.
 
 ## Not yet ready to deploy
 
