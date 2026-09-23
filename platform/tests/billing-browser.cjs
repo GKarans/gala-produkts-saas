@@ -18,6 +18,13 @@ if(!/^http:\/\/127\.0\.0\.1:\d+$/.test(base))throw new Error('Local tests only')
   const response=await context.request.post(base+'/api/events',{headers:{Origin:base},data:{name:'One-time purchase test',time_zone:'UTC',start:new Date(Date.now()+86400000).toISOString().slice(0,16),end:new Date(Date.now()+2*86400000).toISOString().slice(0,16)}});const e=await response.json();assert(e.id);
   await page.goto(`${base}/app/events/${e.id}`);await page.getByRole('button',{name:'Publish event',exact:true}).click();await page.locator('#funding').selectOption('pass');await page.getByRole('button',{name:'Confirm',exact:true}).click();await page.getByRole('button',{name:'Pause uploads',exact:true}).waitFor();
   const used=await(await context.request.get(base+'/api/billing')).json();assert.equal(used.allowance.used,before.allowance.used);assert.equal(used.allowance.passes,before.allowance.passes);
+  const disabledContext=await browser.newContext({viewport:{width:390,height:844}}),disabledPage=await disabledContext.newPage(),disabledErrors=[];
+  disabledPage.on('pageerror',e=>disabledErrors.push(e.message));
+  await disabledContext.route('**/api/config',async route=>{const response=await route.fetch(),config=await response.json();config.checkout='disabled';await route.fulfill({response,json:config});});
+  await disabledPage.goto(base+'/sample-workspace');await disabledPage.getByRole('heading',{name:'My events',exact:true}).waitFor();
+  await disabledPage.goto(base+'/app/billing');await disabledPage.getByRole('heading',{name:'Plan & billing',exact:true}).waitFor();
+  await disabledPage.getByText('Payments are not connected. Explore, event publishing and all photo features are available; paid plan checkout is disabled.').waitFor();
+  assert.deepEqual(disabledErrors,[]);await disabledContext.close();
   await page.setViewportSize({width:390,height:844});await page.goto(base+'/pricing');await page.getByRole('heading',{name:'Plans for your people.'}).waitFor();assert.equal(await page.locator('.plan').count(),4);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:'platform/test-results/pricing-four-mobile.png',fullPage:true});
   await context.request.post(`${base}/api/events/${e.id}/action`,{headers:{Origin:base},data:{action:'delete',confirm:e.name}});assert.deepEqual(errors,[]);
   console.log('Billing browser passed: four plans including free trial, Single Event one-time checkout, preserved subscription, explicit pass publication and responsive pricing.');
