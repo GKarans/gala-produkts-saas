@@ -107,11 +107,13 @@ limit.
    health route are gated before the Worker runs. The owner then opened
    `/healthz` through Access and received
    `{"status":"ok","service":"lumiq-cam","database":"ready","storage":"bound"}`.
-   This verifies Worker startup/migration checks and a query through the test
-   Hyperdrive; it does not yet prove the organizer/Auth flows or staging-data
-   isolation. Keep only the owner and explicitly invited tester emails in the
-   allow policy. Cloudflare's Access Free plan covers up to 50 users; do not
-   upgrade if the dashboard offers a paid plan.
+   After version `636cb1e2-2e0e-49d3-914e-47f335f0239f` was deployed, the owner
+   rechecked `/healthz` through Access and confirmed `database: ready` and
+   `storage: bound`. This verifies Worker startup/migration checks and a query
+   through the test Hyperdrive; it does not prove staging-data isolation. Keep
+   only the owner and explicitly invited tester emails in the allow policy.
+   Cloudflare's Access Free plan covers up to 50 users; do not upgrade if the
+   dashboard offers a paid plan.
 7. Add the new project's Supabase URL and publishable key and a newly generated
    session encryption key as Worker secrets for the closed-test Worker only.
    Keep all secrets out of the repository and chat. The session encryption
@@ -136,18 +138,20 @@ limit.
    was deployed at 20:30 UTC on 2026-09-23 and is at 100%. The deployment
    bindings showed only the test Hyperdrive and R2 bucket, with the R2 budget
    guard enabled. Anonymous `/` and `/healthz` still return Access 302 after
-   deployment. Authenticated `/healthz` was verified on the previous version;
-   recheck it after this deployment. Still verify auth callbacks use only the
-   test URL and requests cannot reach staging data.
+   deployment. The owner rechecked authenticated `/healthz` on this version
+   and confirmed the draft event `Balle` remained available after returning to
+   the app. Still verify auth callbacks use only the test URL and requests
+   cannot reach staging data.
 9. Initially test registration, login, event creation, guest page and QR with
    no cloud photos. The Worker R2 adapter now has an app-side monthly operation
    ceiling and lifetime write-byte ceiling, including Class A object deletion;
    local tests cover concurrent reservations, normal photo/object paths and
    bounded streaming exports. This guard is now deployed in version
-   `636cb1e2-2e0e-49d3-914e-47f335f0239f`. Cloud photo upload remains closed
-   until authenticated health is rechecked, the test account's aggregate R2
-   usage is reviewed, and the owner explicitly starts a tiny synthetic upload
-   test. Record provider usage before and after it.
+   `636cb1e2-2e0e-49d3-914e-47f335f0239f`. The owner has rechecked
+   authenticated health and basic event persistence. Cloud photo upload
+   remains closed until the test account's aggregate R2 usage is reviewed and
+   the owner explicitly starts a tiny synthetic upload test. Record provider
+   usage before and after it.
 
 ## Not yet ready to deploy
 
@@ -172,10 +176,11 @@ limit.
 - The exact test `workers.dev` origin is configured and the separately named
   Worker is deployed. An anonymous request was confirmed to redirect to
   Cloudflare Access before reaching Worker code. The hostname Access
-  application and owner allow rule are visible in the owner's dashboard. The
-  owner-authenticated `/healthz` response confirmed `database: ready` through
-  the test Hyperdrive on 2026-09-23; Auth flows and staging-data isolation are
-  still unverified.
+  application and owner allow rule are visible in the owner's dashboard. After
+  Worker version `636cb1e2-2e0e-49d3-914e-47f335f0239f` was deployed, the owner
+  rechecked `/healthz` through Access and confirmed database/storage readiness;
+  the owner also confirmed draft event `Balle` persisted after returning to
+  the app. Auth recovery and staging-data isolation are still unverified.
 - `PLATFORM_SESSION_ENCRYPTION_KEY`, `PLATFORM_SUPABASE_URL` and
   `PLATFORM_SUPABASE_PUBLISHABLE_KEY` are configured as Worker Secrets. The
   owner verified `/healthz` through Access and the Supabase/Hyperdrive query
@@ -184,8 +189,9 @@ limit.
 - R2 operation and lifetime-byte limits are implemented in the Worker adapter
   and pass local tests; the guard is deployed in Worker version
   `636cb1e2-2e0e-49d3-914e-47f335f0239f`. Anonymous Access still blocks both
-  `/` and `/healthz`. Recheck authenticated health and inspect aggregate R2
-  usage before any cloud photo test. No photo test has been run.
+  `/` and `/healthz`. The owner confirmed authenticated health on that version.
+  Inspect aggregate R2 usage before any cloud photo test. No photo test has
+  been run.
 - A closed test does not satisfy the production release gates in
   `LAUNCH-GATES.md`; production still requires a separate owner approval and
   verified infrastructure, backup/restore, security, reliability and legal
