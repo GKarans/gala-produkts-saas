@@ -151,7 +151,10 @@ limit.
    authenticated health and basic event persistence. Cloud photo upload
    remains closed until the test account's aggregate R2 usage is reviewed and
    the owner explicitly starts a tiny synthetic upload test. Record provider
-   usage before and after it.
+   usage before and after it. Read-only Wrangler bucket info on 2026-09-23
+   showed `lumiq-closed-test-photos`: 0 objects / 0 B and
+   `lumiq-staging-photos`: 11 objects / 502 kB. These are per-bucket counts;
+   they do not establish account-wide storage or Class A/B operation usage.
 
 ## Not yet ready to deploy
 
@@ -190,8 +193,10 @@ limit.
   and pass local tests; the guard is deployed in Worker version
   `636cb1e2-2e0e-49d3-914e-47f335f0239f`. Anonymous Access still blocks both
   `/` and `/healthz`. The owner confirmed authenticated health on that version.
-  Inspect aggregate R2 usage before any cloud photo test. No photo test has
-  been run.
+  Bucket-level stats on 2026-09-23 show the closed-test bucket is empty and
+  Lumiq staging has 11 objects / 502 kB; account-wide storage and operation
+  usage remain unverified. Inspect the Cloudflare account-level R2 usage before
+  any cloud photo test. No photo test has been run.
 - A closed test does not satisfy the production release gates in
   `LAUNCH-GATES.md`; production still requires a separate owner approval and
   verified infrastructure, backup/restore, security, reliability and legal
