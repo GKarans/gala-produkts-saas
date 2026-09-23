@@ -223,10 +223,21 @@ limit.
    bindings. After reloading the existing guest page, it reported that uploads
    had ended: the synthetic event's scheduled end was 2026-09-24 00:15
    Europe/Riga. No retry was sent and no guest photo is completed or verified.
-   The single Explore publication slot is already consumed, so do not create
-   another event, alter the expired event directly, or use `Balle` for this
-   test. A fresh live upload test needs an owner-approved event allowance and
-   a valid future event window.
+   The owner then explicitly approved a free, account-specific Gathering test
+   exception for 30 days; this does not change the public Explore plan or
+   create a paid subscription. No database entitlement has been changed yet.
+   The owner must run the guarded SQL in the Supabase closed-test project,
+   which targets the owner of this exact synthetic event and only a
+   `trial`/`trialing` account without provider IDs. The Access-authenticated
+   `/app/billing` page was verified after Worker version
+   `b1b7fe9e-78a4-4e7a-a422-4a506d63608f` and reports the current account as
+   `Explore`, `1 / 1` used, with payments disabled. Its former missing-button
+   JavaScript error is fixed. Wait for the guarded update to return one row
+   and the page to show `Gathering trialing` with four remaining before
+   creating a fresh future synthetic event. Do not alter the expired event
+   directly or use `Balle` for the photo test. The latest `/healthz` response
+   was not rechecked after this static-asset deploy; the prior owner-verified
+   response remains from the earlier Worker version.
    Local release checks on 2026-09-24 then passed: `npm test` (74/74),
    `npm run build` (60 public files), `npm run security` (160 tracked files,
    zero reported vulnerabilities), `npm run browser` (responsive journeys
@@ -252,7 +263,10 @@ limit.
   in the authenticated Cloudflare account. It now contains only two verified
   Balle design objects (`covers/` and `qr/`); no guest photo is present. A
   separate synthetic test event was published and consumed the sole remaining
-  Explore allowance, but its gallery remains at 0 photos. The test Hyperdrive
+  Explore allowance, but its gallery remains at 0 photos and the event has
+  ended. A free 30-day Gathering exception for this account is approved but
+  awaits the owner's guarded database update; no new event has been created.
+  The test Hyperdrive
   is configured with caching disabled and a
   five-connection origin limit. The ignored local Worker config binds it and
   the separate test bucket; Wrangler dry-run passed. The base Worker config is
@@ -279,12 +293,15 @@ limit.
   Account-level R2 usage has been rechecked: 34.62 MB total storage, `$0.00`
   billable usage, 388 Class A and 1.13k Class B for the current billing period.
   The test bucket has 2 design objects / 144.71 kB under Balle, not photos;
-  staging remains at 11 objects / 501.9 kB. The JSONB fix is now deployed in
-  Worker version `f5f4c65d-446f-49a4-a48c-9d1716d73d4e`; reloading its synthetic
-  guest page showed that event had ended at 00:15 Europe/Riga, before a retry
-  could be made. It remains at 0 guest photos, so the authorized photo test is
-  not complete. The Explore publication allowance has already been consumed;
-  do not create or publish another test event without fresh owner authorization.
+  staging remains at 11 objects / 501.9 kB. The JSONB fix is deployed in
+  Worker version `f5f4c65d-446f-49a4-a48c-9d1716d73d4e`; the later billing UI
+  fix was deployed as `b1b7fe9e-78a4-4e7a-a422-4a506d63608f`. Authenticated
+  `/app/billing` is now verified on that version and still shows Explore
+  `1 / 1`, payments disabled. The owner has authorized a closed-test-only free
+  30-day Gathering exception, but the guarded DB update has not been run yet.
+  Do not create another event until the UI confirms four remaining
+  publications. The expired synthetic event remains at 0 guest photos, so the
+  authorized R2 photo test is not complete.
 - A closed test does not satisfy the production release gates in
   `LAUNCH-GATES.md`; production still requires a separate owner approval and
   verified infrastructure, backup/restore, security, reliability and legal
