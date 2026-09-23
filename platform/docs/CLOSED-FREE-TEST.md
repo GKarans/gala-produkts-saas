@@ -171,7 +171,10 @@ limit.
    showed average storage 0 B, data retrieved 0 B, 5 Class A operations,
    15 Class B operations and request distribution 9. This remains per-bucket
    data, not an account aggregate; the staging bucket and any other account
-   buckets still need review before the synthetic upload decision.
+   buckets still need review before the synthetic upload decision. The same
+   screenshot's Class A/B chart legends showed 0, conflicting with the summary
+   cards; treat those operation counts as provisional until reconciled with the
+   account usage view or analytics data.
 
 ## Not yet ready to deploy
 
