@@ -63,7 +63,7 @@ export function billingService(db,{local,origin,fetcher=fetch}) {
     await tx.query("update orders set status='paid',provider_id=$1 where id=$2",[object.id,order.id]);
     if(PLANS[order.plan]?.billing==='one_time'){
      requireThat(local||object.mode==='payment',400,'A Single Event pass requires a one-time payment.');
-     await tx.query('insert into event_passes(id,owner_id,order_id,entitlement) values($1,$2,$3,$4) on conflict(order_id) do nothing',[uuid(),owner,order.id,JSON.stringify(PLANS.single)]);
+     await tx.query('insert into event_passes(id,owner_id,order_id,entitlement) values($1,$2,$3,$4) on conflict(order_id) do nothing',[uuid(),owner,order.id,PLANS.single]);
      await tx.query('insert into audit(id,actor_id,action,target_id) values($1,$2,$3,$4)',[uuid(),owner,'pass.purchased',order.id]);
      return {ok:true,pass:true};
     }

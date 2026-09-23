@@ -62,7 +62,7 @@ export async function createApp(options={}){
     if(action==='action')return response(await events.action(user,id,input));
     if(action==='photos'){if(req.method==='DELETE')return response(await media.remove(user,e,input.ids));return response(await media.list(e,url.searchParams,{owner:true}));}
     if(action==='curate')return response(await media.curate(user,e,input));
-    if(action==='preview'){const secret=token();await db.query("insert into auth_tokens(token_hash,account_id,purpose,payload,expires_at) values($1,$2,'event-preview',$3,now()+interval '15 minutes')",[hash(secret),user.id,JSON.stringify({event_id:e.id})]);return response({url:`${origin}/event/${e.slug}?preview=${secret}`,expires_in:900});}
+    if(action==='preview'){const secret=token();await db.query("insert into auth_tokens(token_hash,account_id,purpose,payload,expires_at) values($1,$2,'event-preview',$3,now()+interval '15 minutes')",[hash(secret),user.id,{event_id:e.id}]);return response({url:`${origin}/event/${e.slug}?preview=${secret}`,expires_in:900});}
     if(action==='export')return response(await jobs.requestExport(user,e,input),202);
     if(action==='jobs')return response((await db.query('select * from jobs where event_id=$1 and owner_id=$2 order by created_at desc limit 30',[id,user.id])).rows);
     if(action==='duplicate'){const copy={...input,name:`${e.name.slice(0,65)} (copy)`,title:e.appearance.title,subtitle:e.appearance.subtitle,button:e.appearance.button,cover:e.appearance.cover};return response(await events.save(user,copy),201);}

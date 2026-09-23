@@ -22,7 +22,7 @@ export async function openDatabase(options={}) {
  }
  const db={query,transaction,close};
  const entries=[];
- if(!options.skipMigrations)for(const [version,file]of [['001-platform','schema.sql'],['002-delivery-leases','migrations/002-delivery-leases.sql'],['003-publication-allowances','migrations/003-publication-allowances.sql'],['004-account-profile','migrations/004-account-profile.sql'],['005-gallery-curation','migrations/005-gallery-curation.sql'],['006-r2-usage-guard','migrations/006-r2-usage-guard.sql']])entries.push({version,sql:await readFile(path.join(ROOT,'server',file),'utf8')});
+ if(!options.skipMigrations)for(const [version,file]of [['001-platform','schema.sql'],['002-delivery-leases','migrations/002-delivery-leases.sql'],['003-publication-allowances','migrations/003-publication-allowances.sql'],['004-account-profile','migrations/004-account-profile.sql'],['005-gallery-curation','migrations/005-gallery-curation.sql'],['006-r2-usage-guard','migrations/006-r2-usage-guard.sql'],['007-jsonb-parameter-encoding','migrations/007-jsonb-parameter-encoding.sql']])entries.push({version,sql:await readFile(path.join(ROOT,'server',file),'utf8')});
  // A single schema execution is valid in PostgreSQL and PGlite extended mode through transaction.
  if(options.skipMigrations){if(!connection)throw new Error('A database connection is required when migrations are skipped.');}
  else if(!connection||process.env.PLATFORM_MIGRATE==='1')await migrate(db,entries,{local:!connection});

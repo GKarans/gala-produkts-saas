@@ -29,7 +29,7 @@ export async function grantPublication(tx,user,event,funding='plan'){
   entitlement=PLANS[sub.plan];source=entitlement.billing==='trial'?'trial':'subscription';
  }
  requireThat(Date.parse(event.ends_at)<=Date.now()+366*86400000,400,'Schedule the event to end within the next year.');
- await tx.query('insert into event_publications(event_id,owner_id,source,pass_id,entitlement,period_start,period_end) values($1,$2,$3,$4,$5,$6,$7)',[event.id,user.id,source,pass?.id||null,JSON.stringify(entitlement),sub?.period_start||null,sub?.period_end||null]);
+ await tx.query('insert into event_publications(event_id,owner_id,source,pass_id,entitlement,period_start,period_end) values($1,$2,$3,$4,$5,$6,$7)',[event.id,user.id,source,pass?.id||null,entitlement,sub?.period_start||null,sub?.period_end||null]);
  if(pass)await tx.query('update event_passes set redeemed_event_id=$1 where id=$2',[event.id,pass.id]);
  return entitlement;
 }

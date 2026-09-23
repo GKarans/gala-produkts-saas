@@ -65,7 +65,7 @@ export async function saveQrLayout(db,events,user,eventId,input){
   const event=await events.own(user,eventId,tx);
   requireThat(layout.template!=='custom'||event.appearance.qr_background_key,409,'Upload a custom QR background first.');
   requireThat(['draft','published'].includes(event.status)&&Date.parse(event.retention_at)>Date.now(),409,'This event can no longer be redesigned.');
-  await tx.query('update events set appearance=$1::jsonb where id=$2',[JSON.stringify({...event.appearance,qr_layout:layout}),event.id]);
+  await tx.query('update events set appearance=$1::jsonb where id=$2',[{...event.appearance,qr_layout:layout},event.id]);
   return layout;
  });
 }
@@ -77,14 +77,14 @@ export async function replaceQrBackground(db,files,events,user,eventId,data,vali
  try{const source=Buffer.from(data,'base64');if(validateImage){await validateImage(source);image=source;}else{const sharp=await loadSharp();image=await sharp(source,{limitInputPixels:40e6,failOn:'warning'}).rotate().resize({width:3200,height:3200,fit:'inside',withoutEnlargement:true}).webp({quality:90}).toBuffer();}}
  catch{throw new Fault(415,'This QR background could not be opened. Use JPEG, PNG or WebP.');}
  const key=`${initial.storage_prefix}/qr/${uuid()}.webp`,cleanupId=uuid();
- await db.query("insert into jobs(id,owner_id,event_id,type,payload,available_at) values($1,$2,$3,'object-cleanup',$4,now()+interval '10 minutes')",[cleanupId,user.id,eventId,JSON.stringify({keys:[key]})]);
+ await db.query("insert into jobs(id,owner_id,event_id,type,payload,available_at) values($1,$2,$3,'object-cleanup',$4,now()+interval '10 minutes')",[cleanupId,user.id,eventId,{keys:[key]}]);
  await files.put(key,image);
  await db.transaction(async tx=>{
   const event=await events.own(user,eventId,tx);
   requireThat(['draft','published'].includes(event.status)&&Date.parse(event.retention_at)>Date.now(),409,'This event can no longer be redesigned.');
-  await tx.query('update events set appearance=$1::jsonb where id=$2',[JSON.stringify({...event.appearance,qr_background_key:key}),event.id]);
+  await tx.query('update events set appearance=$1::jsonb where id=$2',[{...event.appearance,qr_background_key:key},event.id]);
   await tx.query('delete from jobs where id=$1',[cleanupId]);
-  if(event.appearance.qr_background_key)await tx.query("insert into jobs(id,owner_id,event_id,type,payload) values($1,$2,$3,'object-cleanup',$4)",[uuid(),user.id,eventId,JSON.stringify({keys:[event.appearance.qr_background_key]})]);
+  if(event.appearance.qr_background_key)await tx.query("insert into jobs(id,owner_id,event_id,type,payload) values($1,$2,$3,'object-cleanup',$4)",[uuid(),user.id,eventId,{keys:[event.appearance.qr_background_key]}]);
  });
  return {ok:true};
 }

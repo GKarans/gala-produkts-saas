@@ -197,11 +197,47 @@ limit.
    Class A rose from 378 to 388, while Class B remains 1.13k. No guest photo
    upload has been completed or verified. Preserve the two Balle design
    assets; do not delete them as part of the synthetic photo test.
+   On 2026-09-24, the authorized synthetic guest upload attempt was rejected:
+   the browser showed `0 uploaded · 1 need attention`, and DevTools recorded
+   `POST /api/guest/<slug>/reserve` returning HTTP 409. The UI reported that
+   the event had reached its photo or storage allowance; the organizer gallery
+   remained at `0 of 0`. Code inspection confirms the reservation check counts
+   both `pending` and `uploaded` media against the event's photo and byte
+   entitlement. A read-only database query found no `pending` or `uploaded`
+   media rows. A follow-up read-only query on 2026-09-24 confirmed both
+   `events.entitlement` and `event_publications.entitlement` have
+   `jsonb_typeof(...) = 'string'`, although their displayed contents are
+   serialized plan objects; consequently `->>'id'`, `->>'photos'` and
+   `->>'bytes'` return null. The root cause was JSONB parameters receiving
+   `JSON.stringify(object)` through `postgres.js`, which stores a JSON string
+   scalar instead of an object. Application JSONB writes now pass structured
+   values directly. Added forward migration `007-jsonb-parameter-encoding`
+   unwraps historical object/array JSON strings across JSONB columns. A focused
+   local regression test passed: it verifies new trial entitlements are JSON
+   objects, repairs a simulated legacy scalar, then confirms a trial guest
+   upload reservation succeeds. On 2026-09-24, the owner ran the isolated
+   migration script and it verified `007-jsonb-parameter-encoding` alongside
+   migrations 001-006 on the closed-test database. The closed-test-only Worker
+   was deployed as version `f5f4c65d-446f-49a4-a48c-9d1716d73d4e`; Wrangler
+   reported only the separate test Hyperdrive and `lumiq-closed-test-photos`
+   bindings. After reloading the existing guest page, it reported that uploads
+   had ended: the synthetic event's scheduled end was 2026-09-24 00:15
+   Europe/Riga. No retry was sent and no guest photo is completed or verified.
+   The single Explore publication slot is already consumed, so do not create
+   another event, alter the expired event directly, or use `Balle` for this
+   test. A fresh live upload test needs an owner-approved event allowance and
+   a valid future event window.
+   Local release checks on 2026-09-24 then passed: `npm test` (74/74),
+   `npm run build` (60 public files), `npm run security` (160 tracked files,
+   zero reported vulnerabilities), `npm run browser` (responsive journeys
+   through accessibility), and Wrangler `--dry-run` with only the ignored
+   closed-test config. The upload reservation test is local evidence only; the
+   live R2 upload has not completed.
 
 ## Not yet ready to deploy
 
 - The owner created a separate Supabase Free project. The latest migration
-  script output verified versions `001-platform` through `006-r2-usage-guard`,
+  script output verified versions `001-platform` through `007-jsonb-parameter-encoding`,
   RLS on 17 tables, denied `anon`/`authenticated` SELECT, and confirmed no MVP
   migration ran. Project identifiers and connection credentials are
   intentionally not copied into this repository.
@@ -243,8 +279,12 @@ limit.
   Account-level R2 usage has been rechecked: 34.62 MB total storage, `$0.00`
   billable usage, 388 Class A and 1.13k Class B for the current billing period.
   The test bucket has 2 design objects / 144.71 kB under Balle, not photos;
-  staging remains at 11 objects / 501.9 kB. The synthetic event is live but
-  still has 0 guest photos, so the authorized photo test is not complete.
+  staging remains at 11 objects / 501.9 kB. The JSONB fix is now deployed in
+  Worker version `f5f4c65d-446f-49a4-a48c-9d1716d73d4e`; reloading its synthetic
+  guest page showed that event had ended at 00:15 Europe/Riga, before a retry
+  could be made. It remains at 0 guest photos, so the authorized photo test is
+  not complete. The Explore publication allowance has already been consumed;
+  do not create or publish another test event without fresh owner authorization.
 - A closed test does not satisfy the production release gates in
   `LAUNCH-GATES.md`; production still requires a separate owner approval and
   verified infrastructure, backup/restore, security, reliability and legal

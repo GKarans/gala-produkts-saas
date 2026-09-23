@@ -19,7 +19,7 @@ export function normalizeAppearance(value){
 }
 export function normalizeEvent(event){return event?{...event,appearance:normalizeAppearance(event.appearance),entitlement:jsonValue(event.entitlement,null)}:event;}
 export function eventService(db,mail) {
- const audit=(actor,action,target,detail={})=>db.query('insert into audit(id,actor_id,action,target_id,detail) values($1,$2,$3,$4,$5)',[uuid(),actor,action,target,JSON.stringify(detail)]);
+ const audit=(actor,action,target,detail={})=>db.query('insert into audit(id,actor_id,action,target_id,detail) values($1,$2,$3,$4,$5)',[uuid(),actor,action,target,detail]);
  const own=async(user,id,tx=db)=>{const event=normalizeEvent((await tx.query("select * from events where id=$1 and owner_id=$2 and status<>'deleted'"+(tx===db?'':' for update'),[id,user.id])).rows[0]);requireThat(event,404,'Event not found.');return event;};
  const subscription=async user=>(await db.query('select * from subscriptions where account_id=$1',[user.id])).rows[0];
  return {
@@ -40,10 +40,10 @@ export function eventService(db,mail) {
     requireThat(state!=='archived'&&existing.status!=='archived',409,'An archived event can no longer be changed.');
     requireThat(Date.parse(existing.retention_at)>Date.now(),409,'This event is past its retention period and can no longer be changed.');
     if(state==='completed')requireThat(Date.parse(times.starts_at)===Date.parse(existing.starts_at)&&Date.parse(times.ends_at)===Date.parse(existing.ends_at),409,'A completed event cannot be rescheduled.');
-    if(existing.appearance.cover_key){if(preset)await tx.query("insert into jobs(id,owner_id,event_id,type,payload) values($1,$2,$3,'object-cleanup',$4)",[uuid(),user.id,id,JSON.stringify({keys:[existing.appearance.cover_key]})]);else appearance.cover_key=existing.appearance.cover_key;}
-    await tx.query('update events set name=$1,description=$2,starts_at=$3,ends_at=$4,time_zone=$5,appearance=$6,retention_at=$7 where id=$8',[name,String(input.description||'').slice(0,500),times.starts_at,times.ends_at,times.time_zone,JSON.stringify(appearance),new Date(Date.parse(times.ends_at)+existing.entitlement.retentionDays*86400000).toISOString(),id]);
+    if(existing.appearance.cover_key){if(preset)await tx.query("insert into jobs(id,owner_id,event_id,type,payload) values($1,$2,$3,'object-cleanup',$4)",[uuid(),user.id,id,{keys:[existing.appearance.cover_key]}]);else appearance.cover_key=existing.appearance.cover_key;}
+    await tx.query('update events set name=$1,description=$2,starts_at=$3,ends_at=$4,time_zone=$5,appearance=$6,retention_at=$7 where id=$8',[name,String(input.description||'').slice(0,500),times.starts_at,times.ends_at,times.time_zone,appearance,new Date(Date.parse(times.ends_at)+existing.entitlement.retentionDays*86400000).toISOString(),id]);
    }
-   else{const drafts=(await tx.query("select count(*)::int as n from events where owner_id=$1 and status='draft'",[user.id])).rows[0].n;requireThat(drafts<100,409,'Archive unused drafts before creating another event.');id=uuid();const slug=token().slice(0,32);await tx.query('insert into events(id,owner_id,slug,name,description,starts_at,ends_at,time_zone,appearance,storage_prefix,entitlement,retention_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',[id,user.id,slug,name,String(input.description||'').slice(0,500),times.starts_at,times.ends_at,times.time_zone,JSON.stringify(appearance),`events/${folder(name,id)}`,JSON.stringify(plan),new Date(Date.parse(times.ends_at)+plan.retentionDays*86400000).toISOString()]);}
+   else{const drafts=(await tx.query("select count(*)::int as n from events where owner_id=$1 and status='draft'",[user.id])).rows[0].n;requireThat(drafts<100,409,'Archive unused drafts before creating another event.');id=uuid();const slug=token().slice(0,32);await tx.query('insert into events(id,owner_id,slug,name,description,starts_at,ends_at,time_zone,appearance,storage_prefix,entitlement,retention_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',[id,user.id,slug,name,String(input.description||'').slice(0,500),times.starts_at,times.ends_at,times.time_zone,appearance,`events/${folder(name,id)}`,plan,new Date(Date.parse(times.ends_at)+plan.retentionDays*86400000).toISOString()]);}
    await tx.query('insert into audit(id,actor_id,action,target_id) values($1,$2,$3,$4)',[uuid(),user.id,existing?'event.updated':'event.created',id]);return own(user,id,tx);
   });},
   async action(user,id,input){return db.transaction(async tx=>{await tx.query('select id from accounts where id=$1 for update',[user.id]);const e=await own(user,id,tx);const action=input.action;
@@ -53,7 +53,7 @@ export function eventService(db,mail) {
     requireThat(Date.parse(e.ends_at)-Date.parse(e.starts_at)<=plan.durationDays*86400000,409,`This allowance supports events up to ${plan.durationDays} ${plan.durationDays===1?'day':'days'}.`);
     const usage=(await tx.query("select count(*)::int as n,coalesce(sum(bytes+thumbnail_bytes),0)::bigint as bytes from media where event_id=$1 and status in ('pending','uploaded')",[id])).rows[0];
     requireThat(usage.n<=plan.photos&&Number(usage.bytes)<=plan.bytes,409,'This draft exceeds the selected allowance.');
-    await tx.query("update events set status='published',paused=false,entitlement=$2,retention_at=ends_at+($3*interval '1 day') where id=$1",[id,JSON.stringify(plan),plan.retentionDays]);
+    await tx.query("update events set status='published',paused=false,entitlement=$2,retention_at=ends_at+($3*interval '1 day') where id=$1",[id,plan,plan.retentionDays]);
    }
    else if(action==='pause'||action==='resume'){requireThat(['live','paused','scheduled'].includes(eventState(e)),409,'Uploads cannot be changed after the event.');await tx.query('update events set paused=$1 where id=$2',[action==='pause',id]);}
    else if(action==='archive')await tx.query("update events set status='archived',share_enabled=false where id=$1",[id]);

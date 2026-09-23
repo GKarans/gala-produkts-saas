@@ -13,7 +13,7 @@ const requiredEnvironment = [
   "PLATFORM_SUPABASE_PUBLISHABLE_KEY",
   "PLATFORM_SESSION_ENCRYPTION_KEY"
 ];
-const migrationVersions = ["001-platform", "002-delivery-leases", "003-publication-allowances", "004-account-profile", "005-gallery-curation", "006-r2-usage-guard"];
+const migrationVersions = ["001-platform", "002-delivery-leases", "003-publication-allowances", "004-account-profile", "005-gallery-curation", "006-r2-usage-guard", "007-jsonb-parameter-encoding"];
 let migrationsVerified = false;
 async function getApp(env) {
   for (const name of [...requiredEnvironment, "PLATFORM_EMAIL_KEY", "PLATFORM_EMAIL_FROM"]) {

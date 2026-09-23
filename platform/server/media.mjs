@@ -14,7 +14,7 @@ export function mediaService(db,files,events,validateImage=async bytes=>{const s
  const ready=async id=>{const m=(await db.query('select * from media where id=$1',[id])).rows[0];requireThat(m,404,'Photo not found.');return m;};
  return {
   ready,
-  async discard(e,g,id){return db.transaction(async tx=>{const m=(await tx.query("update media set status='deleted',deleted_at=now() where id=$1 and event_id=$2 and guest_id=$3 and status='pending' returning id",[id,e.id,g.id])).rows[0];if(m)await tx.query("insert into jobs(id,owner_id,event_id,type,payload,available_at) values($1,$2,$3,'media-cleanup',$4,now()+interval '6 minutes')",[uuid(),e.owner_id,e.id,JSON.stringify({ids:[id]})]);return{ok:true};});},
+  async discard(e,g,id){return db.transaction(async tx=>{const m=(await tx.query("update media set status='deleted',deleted_at=now() where id=$1 and event_id=$2 and guest_id=$3 and status='pending' returning id",[id,e.id,g.id])).rows[0];if(m)await tx.query("insert into jobs(id,owner_id,event_id,type,payload,available_at) values($1,$2,$3,'media-cleanup',$4,now()+interval '6 minutes')",[uuid(),e.owner_id,e.id,{ids:[id]}]);return{ok:true};});},
   async reserve(e,g,input){
    requireThat(eventState(e)==='live',409,'This event is closed for uploads.');
    const id=text(input.id,36);requireThat(/^[0-9a-f-]{36}$/i.test(id),400,'Invalid photo identifier.');
@@ -53,9 +53,9 @@ export function mediaService(db,files,events,validateImage=async bytes=>{const s
     const rows=(await tx.query("select id from media where event_id=$1 and id=any($2::uuid[]) and status='uploaded'",[e.id,ids])).rows;requireThat(rows.length===new Set(ids).size,404,'Some selected photos are unavailable.');
     if(input.action==='cover'){requireThat(ids.length===1,400,'Choose one gallery cover.');await tx.query('update events set gallery_cover_id=$1 where id=$2',[ids[0],e.id]);}
     else{const change=actions[input.action];requireThat(change,400,'Unknown gallery action.');await tx.query(`update media set ${change[0]}=$1 where event_id=$2 and id=any($3::uuid[])`,[change[1],e.id,ids]);}
-    await tx.query('insert into audit(id,actor_id,action,target_id,detail) values($1,$2,$3,$4,$5)',[uuid(),user.id,`gallery.${input.action}`,e.id,JSON.stringify({ids})]);return{ok:true};
+    await tx.query('insert into audit(id,actor_id,action,target_id,detail) values($1,$2,$3,$4,$5)',[uuid(),user.id,`gallery.${input.action}`,e.id,{ids}]);return{ok:true};
    });
   },
-  async remove(user,e,ids){requireThat(Array.isArray(ids)&&ids.length>0&&ids.length<=200,400,'Select 1 to 200 photos.');await db.transaction(async tx=>{const rows=(await tx.query("select id from media where event_id=$1 and id=any($2::uuid[]) and status='uploaded'",[e.id,ids])).rows;requireThat(rows.length===new Set(ids).size,404,'Some selected photos are unavailable.');await tx.query("update media set status='deleted',deleted_at=now() where event_id=$1 and id=any($2::uuid[])",[e.id,ids]);await tx.query('update events set gallery_cover_id=null where id=$1 and gallery_cover_id=any($2::uuid[])',[e.id,ids]);await tx.query("insert into jobs(id,owner_id,event_id,type,payload) values($1,$2,$3,'media-cleanup',$4)",[uuid(),user.id,e.id,JSON.stringify({ids})]);});return{ok:true};}
+  async remove(user,e,ids){requireThat(Array.isArray(ids)&&ids.length>0&&ids.length<=200,400,'Select 1 to 200 photos.');await db.transaction(async tx=>{const rows=(await tx.query("select id from media where event_id=$1 and id=any($2::uuid[]) and status='uploaded'",[e.id,ids])).rows;requireThat(rows.length===new Set(ids).size,404,'Some selected photos are unavailable.');await tx.query("update media set status='deleted',deleted_at=now() where event_id=$1 and id=any($2::uuid[])",[e.id,ids]);await tx.query('update events set gallery_cover_id=null where id=$1 and gallery_cover_id=any($2::uuid[])',[e.id,ids]);await tx.query("insert into jobs(id,owner_id,event_id,type,payload) values($1,$2,$3,'media-cleanup',$4)",[uuid(),user.id,e.id,{ids}]);});return{ok:true};}
  };
 }
