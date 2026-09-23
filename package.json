@@ -22,6 +22,8 @@
     "backup:verify": "node platform/scripts/verify-backup.mjs",
     "restore:drill": "node platform/scripts/restore-drill.mjs",
     "cost": "node platform/scripts/cost-model.mjs",
+    "cloudflare:dev": "node platform/scripts/block-deploy.mjs --dev",
+    "cloudflare:deploy": "node platform/scripts/block-deploy.mjs",
     "check": "npm run security && npm run verify && npm run browser"
   },
   "dependencies": {
@@ -40,6 +42,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.10.2",
     "acorn": "8.18.0",
-    "playwright": "1.63.0"
+    "playwright": "1.63.0",
+    "wrangler": "4.136.3"
   }
 }

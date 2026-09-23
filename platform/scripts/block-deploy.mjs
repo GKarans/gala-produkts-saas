@@ -1,2 +1,3 @@
-console.error('Deployment is disabled in the isolated platform copy. Complete platform/docs/SETUP.md and the launch gates before creating any staging deployment. The MVP deployment configuration must not be reused.');
+const action = process.argv[2] === '--dev' ? 'local preview' : 'deployment';
+console.error(`Cloudflare ${action} via the base config is blocked: it targets the existing lumiq.cam staging Worker and its data. Use npm run dev for isolated local work. The closed test uses its separate ignored config; production remains locked until every launch gate and owner approval is complete.`);
 process.exitCode=1;
