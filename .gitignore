@@ -1,7 +1,9 @@
 node_modules/
+**/.wrangler/
 platform/.local/
 platform/dist/
 platform/test-results/
+cloudflare/worker/wrangler.closed-test.jsonc
 .env
 .env.*
 !.env.example
