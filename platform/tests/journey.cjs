@@ -16,7 +16,7 @@ if(!/^http:\/\/127\.0\.0\.1:\d+$/.test(base))throw new Error('Local tests only')
   await page.getByRole('button',{name:'Create event',exact:true}).first().click();await page.getByLabel('Event name').fill('Browser.Journey.With.A.Very.Long.Unbroken.Name.For.Responsive.Checking');
   const clock=offset=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Riga',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(Date.now()+offset)).replace(' ','T');
   await page.getByLabel('Starts',{exact:true}).fill(clock(-3600000));await page.getByLabel('Ends',{exact:true}).fill(clock(3600000));await page.getByRole('button',{name:'Save draft'}).click();await page.getByRole('button',{name:'Publish event'}).click();await page.getByRole('button',{name:'Confirm',exact:true}).click();await page.getByRole('button',{name:'Pause uploads'}).waitFor();
-  const eventId=new URL(page.url()).pathname.split('/').pop();const e=await(await context.request.get(base+'/api/events/'+eventId)).json();
+  const eventId=new URL(page.url()).pathname.split('/').pop().match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)?.[0];assert.ok(eventId,'event URL should end in its canonical ID');const e=await(await context.request.get(base+'/api/events/'+eventId)).json();
   await page.goto(base+'/event/'+e.slug);await page.getByLabel('Your name',{exact:true}).fill('Photographer');await page.getByRole('button',{name:'Join the gathering'}).click();await page.getByRole('button',{name:'Choose photos'}).waitFor();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   const fixture=await sharp({create:{width:80,height:60,channels:3,background:'#2e866f'}}).jpeg().toBuffer();

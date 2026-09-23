@@ -91,7 +91,8 @@ Prioritāte P1/P2; lielo eksportu worker izvēli pamatot ar mērījumiem.
 - [ ] D6 NEUZSĀKTS: servera thumbnail ģenerēšana/atjaunošana un redzams processing/failed stāvoklis; jobs neizpildās divreiz pēc atkārtota ziņojuma.
 - [ ] D7 DAĻĒJI: viesu sharing slēdzis, termiņš, preview/download; atšķirīgi closed/expired/quota/network paziņojumi un redzams atlikums organizatoram.
 - [ ] D8 NEUZSĀKTS: mērīt sarakstu, thumbnail un pilno foto izmaksas atsevišķi; hardcoded 2000 pieprasījumu limitu aizvietot ar pārbaudītu produkta konfigurāciju.
-- [ ] D9 NEUZSĀKTS: drukājami QR plakāti/galda kartītes ar nosaukumu un īsu instrukciju; reāli drukas testi. Saites maiņai brīdināt par veco QR nederīgumu.
+- [ ] D9 NEUZSĀKTS: drukājami QR plakāti/galda kartītes ar nosaukumu un īsu instrukciju; drukas priekšskatījumam jāietilpst vienā A5 ainavas lapā bez API adreses un satura sadalīšanas. Pārbaudīt PDF un reālu izdruku/QR skenēšanu. Saites maiņai brīdināt par veco QR nederīgumu.
+- [ ] D11 NEUZSĀKTS: paplašināt QR dizaina redaktoru: brīvi pārvietot visus teksta blokus, rediģēt apakšējo instrukciju un tās novietojumu, kā arī redzami atšķirt saglabāto no nesaglabātā dizaina. Pieņemšana: katrs drukā redzamais teksta elements ir rediģējams un pārvietojams, un pēc saglabāšanas atjaunojas pareizi.
 - [ ] D10 ATLIKTS: publicējamo foto atlase/moderācija, ja tas ir pārdotā pakalpojuma nosacījums.
 
 Pieņemšana: visi saglabātie foto ir izgūstami, liels eksports atkopjams pēc pārlādes, un parasta viesu pārlūkošana neiztērē kvotu bez saprotama skaidrojuma.
@@ -106,6 +107,7 @@ Prioritāte P1 minimumam, P2 paplašinājumiem.
 - [ ] E4 DAĻĒJI: upcoming/live/completed/archived saraksti, meklēšana/kārtošana, foto skaits, piekļuve support un skaidra Create event darbība.
 - [ ] E5 NEUZSĀKTS: iegādātās iespējas, atlikusī kvota un glabāšanas/brīdinājumu termiņi klienta dashboard.
 - [ ] E6 NEUZSĀKTS: piekļūstamība: dialogu/tabs semantika, fokuss, tastatūra, reduced motion, kontrasts abās tēmās, zoom un mobilā tastatūra.
+- [ ] E7 ATLIKTS: pielāgots e-pasta sūtītājs ar `lumiq.cam` domēnu un zīmola veidnēm. Vēlāk izvēlēties e-pasta piegādātāju, verificēt domēna DNS (SPF/DKIM/DMARC) un notestēt reālu reģistrācijas, apstiprināšanas un paroles atjaunošanas piegādi.
 
 Pieņemšana: nepazīstams lietotājs pats sasniedz dashboard, izveido eventu un atrod palīdzību; nekas no citas sesijas nepaliek redzams.
 

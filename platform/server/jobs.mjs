@@ -1,7 +1,7 @@
 import {PassThrough} from 'node:stream';
 import {Zip,ZipPassThrough,strToU8} from 'fflate';
 import {uuid,requireThat,hash} from './security.mjs';
-import sharp from 'sharp';
+import {loadSharp} from './image-runtime.mjs';
 import {collectNotices} from './notifications.mjs';
 import {localized} from './locale.mjs';
 import {sendAlert} from './alerts.mjs';
@@ -29,7 +29,7 @@ export function jobService(db,files,mail){
      }catch(error){zip.terminate();output.destroy(error);reject(error);}
     })();
    });
-   await Promise.all([files.putStream(key,output,'application/zip'),finished]);
+   await Promise.all([files.putStream(key,output,'application/zip',{maxBytes:bytes+1024**2}),finished]);
    parts.push({key,name:`event-photos-${index}.zip`,bytes:archiveBytes,count:batch.length});
    await db.query('update jobs set result=$1 where id=$2',[JSON.stringify({parts,partial:true}),job.id]);
    batch=[];bytes=0;
@@ -42,7 +42,7 @@ export function jobService(db,files,mail){
   if(job.type==='thumbnail-repair'){
    const m=(await db.query("select * from media where id=$1 and event_id=$2 and status='uploaded'",[job.payload.id,job.event_id])).rows[0];
    requireThat(m,404,'Photo no longer available.');
-   const thumb=await sharp(await files.get(m.object_key),{limitInputPixels:40e6}).rotate().resize({width:360,height:360,fit:'inside',withoutEnlargement:true}).webp({quality:74}).toBuffer();
+   const sharp=await loadSharp(),thumb=await sharp(await files.get(m.object_key),{limitInputPixels:40e6}).rotate().resize({width:360,height:360,fit:'inside',withoutEnlargement:true}).webp({quality:74}).toBuffer();
    await files.put(m.thumbnail_key,thumb);
    await db.query("update media set thumbnail_bytes=$1,thumbnail_checksum=$2 where id=$3 and status='uploaded'",[thumb.length,hash(thumb),m.id]);
    return{repaired:m.id};

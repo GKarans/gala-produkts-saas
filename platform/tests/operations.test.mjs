@@ -5,12 +5,35 @@ import path from 'node:path';
 import os from 'node:os';
 import sharp from 'sharp';
 import {openDatabase} from '../server/db.mjs';
-import {createApp} from '../server/app.mjs';
+import {createApp,isReleaseApproved} from '../server/app.mjs';
 import {storage} from '../server/storage.mjs';
 import {uuid,hash} from '../server/security.mjs';
 import {collectNotices,queueMessage} from '../server/notifications.mjs';
 import {mailDelivery} from '../server/mail.mjs';
 import {replaceCover} from '../server/covers.mjs';
+import {replaceQrBackground,saveQrLayout} from '../server/qr-posters.mjs';
+import {normalizeEvent} from '../server/events.mjs';
+import {validateWebp} from '../../cloudflare/worker/src/webp-validation.js';
+
+test('deployment approval matches the explicit environment and keeps production locked by default',()=>{
+ assert.equal(isReleaseApproved('staging','staging'),true);
+ assert.equal(isReleaseApproved('production','production'),true);
+ assert.equal(isReleaseApproved('production','staging'),false);
+ assert.equal(isReleaseApproved('staging','production'),false);
+ assert.equal(isReleaseApproved(undefined,undefined),false);
+});
+
+test('event JSONB values returned as strings are normalized before use',()=>{
+ const event=normalizeEvent({appearance:'{"cover":"/api/covers/id","title":"Saved"}',entitlement:'{"retentionDays":14}'});
+ assert.deepEqual(event.appearance,{cover:'/api/covers/id',title:'Saved'});
+ assert.deepEqual(event.entitlement,{retentionDays:14});
+ const legacy=normalizeEvent({appearance:[
+  '{"title":"Ballīte","cover":"/assets/garden-gathering.webp","font":"roboto"}',
+  '{"qr_layout":{"template":"modern","font":"playfair-display"}}',
+  '{"qr_layout":{"template":"vintage","font":"playfair-display"}}'
+ ]});
+ assert.deepEqual(legacy.appearance,{title:'Ballīte',cover:'/assets/garden-gathering.webp',font:'roboto',qr_layout:{template:'vintage',font:'playfair-display'}});
+});
 
 test('service notices deduplicate and delivery retries survive worker restarts',async()=>{
  const db=await openDatabase({memory:true}),owner={id:uuid(),email:'notices@example.test',name:'Notifications'};
@@ -48,13 +71,29 @@ test('cover replacement preserves the attached file and cleans failed attachment
  const files=storage({root}),app=await createApp({db,files}),user={id:uuid(),email:'cover@example.test',name:'Cover'};
  try{
   await db.query('insert into accounts(id,email,name) values($1,$2,$3)',[user.id,user.email,user.name]);await db.query('insert into subscriptions(account_id) values($1)',[user.id]);
-  const e=await app.events.save(user,{name:'Cover fixture',time_zone:'UTC',start:new Date(Date.now()-3600000).toISOString().slice(0,16),end:new Date(Date.now()+3600000).toISOString().slice(0,16)});
+  const start=new Date(Date.now()-2*3600000).toISOString().slice(0,16),end=new Date(Date.now()-3600000).toISOString().slice(0,16);
+  const e=await app.events.save(user,{name:'Cover fixture',time_zone:'UTC',start,end});
+  await db.query('update events set appearance=$1::jsonb where id=$2',[JSON.stringify([
+   JSON.stringify({title:'Cover fixture',cover:'/assets/garden-gathering.webp',font:'roboto'}),
+   JSON.stringify({qr_layout:{template:'modern',font:'playfair-display'}})
+  ]),e.id]);
+  const qrLayout=await saveQrLayout(db,app.events,user,e.id,{template:'vintage',font:'roboto',qrY:.62});
+  assert.deepEqual(qrLayout,{template:'vintage',font:'roboto',titleSize:76,textX:.5,textY:.15,qrX:.5,qrY:.62,qrScale:1});
   const data=(await sharp({create:{width:16,height:16,channels:3,background:'#16835e'}}).webp().toBuffer()).toString('base64');
-  await replaceCover(db,files,app.events,user,e.id,data);const first=(await app.events.own(user,e.id)).appearance.cover_key;
-  await replaceCover(db,files,app.events,user,e.id,data);const second=(await app.events.own(user,e.id)).appearance.cover_key;
+  await replaceQrBackground(db,files,app.events,user,e.id,data,validateWebp);const qrBackground=(await app.events.own(user,e.id)).appearance.qr_background_key;
+  assert.match(qrBackground,/\/qr\/.*\.webp$/);
+  await replaceCover(db,files,app.events,user,e.id,data,validateWebp);const first=(await app.events.own(user,e.id)).appearance.cover_key;
+  const updated=await app.events.save(user,{name:'Cover fixture',title:'Saved design',time_zone:'UTC',start,end},e.id);
+  assert.equal(updated.appearance.title,'Saved design');
+  assert.equal(updated.appearance.cover,`/api/covers/${e.id}`);
+  assert.equal(updated.appearance.cover_key,first);
+  assert.deepEqual(updated.appearance.qr_layout,qrLayout);
+  assert.equal(updated.appearance.font,'roboto');
+  assert.equal(updated.appearance.qr_background_key,qrBackground);
+  await replaceCover(db,files,app.events,user,e.id,data,validateWebp);const second=(await app.events.own(user,e.id)).appearance.cover_key;
   assert.notEqual(first,second);await app.jobs.tick();await assert.rejects(files.get(first));assert.ok(await files.size(second));
   await app.events.action(user,e.id,{action:'archive'});
-  await assert.rejects(replaceCover(db,files,app.events,user,e.id,data),/redesigned/);
+  await assert.rejects(replaceCover(db,files,app.events,user,e.id,data,validateWebp),/no longer be redesigned/);
   const cleanup=(await db.query("select * from jobs where status='queued' and type='object-cleanup'")).rows;
   assert.equal(cleanup.length,1);const detached=cleanup[0].payload.keys[0];assert.ok(await files.size(detached));
   await db.query('update jobs set available_at=now() where id=$1',[cleanup[0].id]);await app.jobs.tick();await assert.rejects(files.get(detached));assert.ok(await files.size(second));

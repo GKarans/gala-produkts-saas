@@ -52,7 +52,7 @@ if(!/^http:\/\/127\.0\.0\.1:\d+$/.test(base))throw Error('Local only');
  await page.getByLabel('Virsraksta izmērs').fill('88');
  await page.getByRole('button',{name:'Liels',exact:true}).click();
  await page.waitForFunction(()=>{const href=document.querySelector('#download-design')?.getAttribute('href')||'';return href.includes('format=table')&&href.includes('download=1')&&href.includes('template=vintage')&&href.includes('font=playfair-display')&&href.includes('titleSize=88');});
- assert.equal(await page.getByRole('link',{name:'Lejupielādēt QR PNG'}).getAttribute('href').then(href=>href.includes('format=qr')&&href.includes('download=1')),true);
+ assert.equal(await page.getByRole('link',{name:'Lejupielādēt QR SVG'}).getAttribute('href').then(href=>href.includes('format=qr')&&href.includes('download=1')),true);
  assert.equal(await page.getByText('Pārbaudīt priekšskatījumu',{exact:true}).count(),0);
  assert.equal(await page.getByText('A5',{exact:true}).count(),0);
  const handle=page.getByRole('button',{name:'Pārvietot QR kodu'}),before=await handle.boundingBox(),stage=await page.locator('#qr-stage').boundingBox();
@@ -63,9 +63,27 @@ if(!/^http:\/\/127\.0\.0\.1:\d+$/.test(base))throw Error('Local only');
  await page.getByText('QR dizains saglabāts.').waitFor();
  await page.getByRole('button',{name:'Drukāt dizainu'}).waitFor();
  await page.getByRole('link',{name:'Atvērt Canva'}).waitFor();
- await page.getByText('Lumiq augšupielādētajam dizainam neko nepievienos un nepārvietos.',{exact:false}).waitFor();
+ await page.getByText('Pabeidz dizainu Canva',{exact:true}).waitFor();
  await page.screenshot({path:'platform/test-results/qr-builder-lv.png'});
  await page.getByRole('button',{name:'Aizvērt logu'}).click();
+ await page.goto(base+'/app');
+ await page.locator('.event-row').filter({hasText:'Studio evening'}).getByRole('link',{name:'Atvērt',exact:true}).click();
+  await page.getByRole('button',{name:'Drukāt vai lejupielādēt QR kodu'}).click();
+  await page.locator('[data-qr-template="vintage"][aria-pressed="true"]').waitFor();
+  await page.getByRole('button',{name:'Aizvērt logu'}).click();
+  await page.getByRole('button',{name:'Drukāt vai lejupielādēt QR kodu'}).click();
+  const customUpload=page.waitForResponse(r=>r.url().includes('/qr-background')&&r.request().method()==='POST');
+  await page.locator('#qr-background').setInputFiles({name:'custom-poster.png',mimeType:'image/png',buffer:await sharp({create:{width:320,height:220,channels:3,background:'#d4a16f'}}).png().toBuffer()});
+  assert.equal((await customUpload).status(),200);
+  await page.locator('[data-qr-template="custom"][aria-pressed="true"]').waitFor();
+  await page.getByRole('button',{name:'Aizvērt logu'}).click();
+  await page.goto(base+eventPath+'?tab=design');await page.locator('#design-form').waitFor();
+  await page.locator('#design-form [name=title]').fill('Vasaras vakars');
+  const guestSave=page.waitForResponse(r=>r.url().includes('/api/events/')&&r.request().method()==='PATCH');
+  await page.getByRole('button',{name:'Saglabāt viesa lapu',exact:true}).click();assert.equal((await guestSave).status(),200);
+  const persisted=await(await page.request.get(base+'/api/events/'+eventPath.match(/[0-9a-f-]{36}$/i)[0])).json();
+  assert.equal(persisted.appearance.title,'Vasaras vakars');assert(persisted.appearance.qr_background_key);assert.equal(persisted.appearance.qr_layout.template,'custom');
+  await page.goto(base+eventPath+'?tab=gallery');
  const untranslated={
   design:['Guest page','Save guest page','Cover collection','Current photo','Replace photo','Button color','Welcome','Camera'],
   sharing:['Guests use the same event link','Photo and gallery requests','Up to 60 days'],

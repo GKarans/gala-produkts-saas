@@ -7,12 +7,17 @@ import {enhanceSelectMenus} from './select-menu.js';
 let version=0;document.documentElement.lang=language();document.addEventListener('change',e=>{if(!e.target.matches('[data-language]'))return;if(document.querySelector('#upload-queue .queue-item')){e.target.value=language();toast(t('Finish your photo queue before changing language.'),true);return;}const form=document.querySelector('form');if(form&&!form.checkValidity()&&form.querySelector('input:not([type=hidden])')?.value.trim()){e.target.value=language();toast(t('Submit or clear the form before changing language.'),true);return;}setLanguage(e.target.value);render();});
 document.body.classList.toggle('dark',localStorage.getItem('lumiq-theme')==='dark');
 async function render(){const request=++version;disposeGuest();disposeWorkspace();const app=document.getElementById('app'),path=location.pathname;document.getElementById('dialog').close();document.getElementById('dialog').onkeydown=null;try{
- state.config??=await api('/config');state.user=(await api('/auth/session')).user;
+ if(path==='/auth/verify'){
+  const query=new URLSearchParams(location.search),fragment=new URLSearchParams(location.hash.slice(1)),value=key=>query.get(key)||fragment.get(key);
+  const accessToken=value('access_token');
+  if(accessToken){const confirmation={access_token:accessToken,refresh_token:value('refresh_token'),expires_in:value('expires_in'),type:value('type'),purpose:'verify'};history.replaceState({},'','/auth/verify');await api('/auth/consume',{method:'POST',body:confirmation});toast('Email confirmed. Your account is ready.');history.replaceState({},'','/app');return await render();}
+ }
+ const [config,session]=await Promise.all([state.config?Promise.resolve(state.config):api('/config'),api('/auth/session')]);state.config=config;state.user=session.user;
  if(request!==version)return;
  if((path.startsWith('/app')||path.startsWith('/checkout/'))&&!state.user){go('/login');return;}
  let html,wire=()=>{};
  if(path==='/app'){html=await dashboard();wire=wireDashboard;}
- else if(/^\/app\/events\/[0-9a-f-]+$/i.test(path)){html=await detail(path.split('/')[3]);wire=wireDetail;}
+ else if(/^\/app\/events\/(?:[a-z0-9-]+-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(path)){const id=path.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)[0];html=await detail(id);wire=wireDetail;}
  else if(path==='/app/billing'){html=await billingPage();wire=wireBilling;}
  else if(path==='/app/account'){html=accountPage();wire=wireAccount;}
  else if(path==='/app/support')html=await supportPage();

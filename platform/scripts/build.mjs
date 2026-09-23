@@ -6,7 +6,7 @@ import {VERSION} from '../shared/plans.js';
 // Only the public surface is packaged. No environment, database or reference files.
 const destination=path.join(ROOT,'dist');
 await mkdir(destination,{recursive:true});
-await cp(path.join(ROOT,'public'),destination,{recursive:true,filter:source=>!source.endsWith('.png')});
+await cp(path.join(ROOT,'public'),destination,{recursive:true,filter:source=>!source.endsWith('.png')||source.endsWith(path.join('assets','brand-mark.png'))});
 await mkdir(path.join(destination,'shared'),{recursive:true});
 await mkdir(path.join(destination,'vendor'),{recursive:true});
 await cp(path.join(ROOT,'shared'),path.join(destination,'shared'),{recursive:true});

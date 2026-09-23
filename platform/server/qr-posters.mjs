@@ -1,19 +1,18 @@
-import sharp from 'sharp';
+import {loadSharp} from './image-runtime.mjs';
 import QRCode from 'qrcode';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {uuid,requireThat,Fault} from './security.mjs';
 import {ROOT} from './db.mjs';
-import {FONT_IDS,normalizeFont} from '../shared/fonts.js';
+import {FONT_IDS,FONT_FAMILIES,normalizeFont} from '../shared/fonts.js';
 
 export const QR_TEMPLATES=['garden','vintage','celebration','modern','custom'];
 export const QR_FONTS=FONT_IDS;
 export const DEFAULT_QR_LAYOUT={template:'garden',font:'playfair-display',titleSize:76,textX:.5,textY:.15,qrX:.5,qrY:.57,qrScale:1};
 
 const xml=value=>String(value).replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]));
-const sizes={table:[2480,1748]},fontCache=new Map();
+const sizes={table:[2480,1748]};
 const number=(value,min,max,fallback)=>{const parsed=Number(value);return Number.isFinite(parsed)?Math.min(max,Math.max(min,parsed)):fallback;};
-async function embeddedFont(id){if(!fontCache.has(id))fontCache.set(id,readFile(path.join(ROOT,'public','assets','fonts',`${id}.ttf`)).then(bytes=>bytes.toString('base64')));return fontCache.get(id);}
 
 export function normalizeQrLayout(input={}){
  return {
@@ -40,46 +39,50 @@ export async function renderQrPoster({event,target,format='qr',layout:input={},c
  requireThat(['qr',...Object.keys(sizes)].includes(format),400,'Choose a supported QR print format.');
  const layout=normalizeQrLayout(input);
  requireThat(layout.template!=='custom'||customBackground,409,'Upload a custom QR background first.');
- const qr=await QRCode.toBuffer(target,{width:1200,margin:4,errorCorrectionLevel:'H'});
+ const qr=await QRCode.toString(target,{type:'svg',width:1200,margin:4,errorCorrectionLevel:'H'});
  if(format==='qr')return qr;
- if(layout.template==='custom')return sharp(customBackground).png().toBuffer();
+ if(layout.template==='custom')return customBackground;
  const [width,height]=sizes[format],minSide=Math.min(width,height);
  const qrSize=Math.round(minSide*.43*layout.qrScale),qrPanelW=qrSize+132,qrPanelH=qrSize+220;
  const qrCenterX=Math.round(number(layout.qrX,qrPanelW/(2*width),(width-qrPanelW/2)/width,.5)*width);
  const qrCenterY=Math.round(number(layout.qrY,qrPanelH/(2*height),(height-qrPanelH/2)/height,.57)*height);
  const qrLeft=Math.round(qrCenterX-qrSize/2),qrTop=Math.round(qrCenterY-qrPanelH/2+62);
- const base=await sharp(Buffer.from(`<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${decoration(layout.template,width,height)}</svg>`)).png().toBuffer();
+ const viewBox=qr.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/)?.slice(1).map(Number),qrPath=qr.match(/<path stroke="#000000"[^>]*d="([^"]+)"/)?.[1];
+ requireThat(viewBox?.length===2&&qrPath,500,'QR image could not be generated.');
  const eventDate=new Intl.DateTimeFormat(lang==='lv'?'lv-LV':'en-GB',{day:'numeric',month:'long',year:'numeric',timeZone:event.time_zone||'UTC'}).format(new Date(event.starts_at));
  const requested=layout.titleSize*(minSide/1600),fitted=Math.floor(width*.64/Math.max(8,event.name.length)*1.7),titleSize=Math.max(34,Math.min(requested,fitted));
- const fontData=await embeddedFont(layout.font),light=layout.template==='celebration',titleInk=light?'#fffaf0':'#142f27',secondaryInk=light?'#f3eee5':'#334c43';
+ const light=layout.template==='celebration',titleInk=light?'#fffaf0':'#142f27',secondaryInk=light?'#f3eee5':'#334c43';
  const textPanelW=Math.round(width*.72),textPanelH=Math.round(Math.max(210,titleSize+145)),textX=Math.round(layout.textX*width),textY=Math.round(layout.textY*height);
  const textLeft=Math.round(Math.min(width-textPanelW-55,Math.max(55,textX-textPanelW/2))),textTop=Math.round(Math.min(height-textPanelH-55,Math.max(55,textY-textPanelH/2)));
  const copy=lang==='lv'?'Noskenē un pievieno savus foto':'Scan to share your photos',foot=lang==='lv'?'Bez lietotnes un viesa konta. Viena kopīga galerija.':'No app. No guest account. One shared gallery.';
- const overlay=Buffer.from(`<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><style>@font-face{font-family:PosterFont;src:url(data:font/ttf;base64,${fontData})}.brand{font:700 ${Math.round(44*minSide/1600)}px PosterFont,sans-serif;fill:${titleInk};letter-spacing:4px}.title{font:700 ${titleSize}px PosterFont,sans-serif;fill:${titleInk}}.date{font:${Math.round(31*minSide/1600)}px PosterFont,sans-serif;fill:${secondaryInk}}.copy{font:${Math.round(32*minSide/1600)}px PosterFont,sans-serif;fill:#173e31}.foot{font:${Math.round(22*minSide/1600)}px PosterFont,sans-serif;fill:${secondaryInk}}</style><text x="${textLeft+textPanelW/2}" y="${textTop+58}" text-anchor="middle" class="brand">LUMIQ</text><text x="${textLeft+textPanelW/2}" y="${textTop+125+titleSize*.15}" text-anchor="middle" class="title">${xml(event.name.slice(0,52))}</text><text x="${textLeft+textPanelW/2}" y="${textTop+textPanelH-34}" text-anchor="middle" class="date">${xml(eventDate)}</text><rect x="${qrCenterX-qrPanelW/2}" y="${qrCenterY-qrPanelH/2}" width="${qrPanelW}" height="${qrPanelH}" rx="42" fill="#fffefb" opacity=".97"/><text x="${qrCenterX}" y="${qrTop+qrSize+78}" text-anchor="middle" class="copy">${copy}</text><text x="${width/2}" y="${height-67}" text-anchor="middle" class="foot">${foot}</text></svg>`);
- return sharp(base).composite([{input:overlay,left:0,top:0},{input:await sharp(qr).resize(qrSize,qrSize).png().toBuffer(),left:qrLeft,top:qrTop}]).png().toBuffer();
+ const font=FONT_FAMILIES[layout.font],scale=qrSize/Math.max(...viewBox);
+ return `<svg xmlns="http://www.w3.org/2000/svg" width="210mm" height="148mm" viewBox="0 0 ${width} ${height}">${decoration(layout.template,width,height)}<text x="${textLeft+textPanelW/2}" y="${textTop+58}" text-anchor="middle" font-family="${xml(font)}" font-size="${Math.round(44*minSide/1600)}" font-weight="700" fill="${titleInk}">LUMIQ</text><text x="${textLeft+textPanelW/2}" y="${textTop+125+titleSize*.15}" text-anchor="middle" font-family="${xml(font)}" font-size="${titleSize}" font-weight="700" fill="${titleInk}">${xml(event.name.slice(0,52))}</text><text x="${textLeft+textPanelW/2}" y="${textTop+textPanelH-34}" text-anchor="middle" font-family="${xml(font)}" font-size="${Math.round(31*minSide/1600)}" fill="${secondaryInk}">${xml(eventDate)}</text><rect x="${qrCenterX-qrPanelW/2}" y="${qrCenterY-qrPanelH/2}" width="${qrPanelW}" height="${qrPanelH}" rx="42" fill="#fffefb" opacity=".97"/><g transform="translate(${qrLeft} ${qrTop}) scale(${scale})"><path fill="#fff" d="M0 0h${viewBox[0]}v${viewBox[1]}H0z"/><path stroke="#000" d="${qrPath}"/></g><text x="${qrCenterX}" y="${qrTop+qrSize+78}" text-anchor="middle" font-family="${xml(font)}" font-size="${Math.round(32*minSide/1600)}" fill="#173e31">${copy}</text><text x="${width/2}" y="${height-67}" text-anchor="middle" font-family="${xml(font)}" font-size="${Math.round(22*minSide/1600)}" fill="${secondaryInk}">${foot}</text></svg>`;
 }
 
 export async function saveQrLayout(db,events,user,eventId,input){
- const event=await events.own(user,eventId),layout=normalizeQrLayout(input);
- requireThat(layout.template!=='custom'||event.appearance.qr_background_key,409,'Upload a custom QR background first.');
- requireThat(['draft','published'].includes(event.status)&&Date.parse(event.ends_at)>Date.now(),409,'A completed or archived event cannot be redesigned.');
- await db.query('update events set appearance=appearance||$1::jsonb where id=$2',[JSON.stringify({qr_layout:layout}),event.id]);
- return layout;
+ const layout=normalizeQrLayout(input);
+ return db.transaction(async tx=>{
+  const event=await events.own(user,eventId,tx);
+  requireThat(layout.template!=='custom'||event.appearance.qr_background_key,409,'Upload a custom QR background first.');
+  requireThat(['draft','published'].includes(event.status)&&Date.parse(event.retention_at)>Date.now(),409,'This event can no longer be redesigned.');
+  await tx.query('update events set appearance=$1::jsonb where id=$2',[JSON.stringify({...event.appearance,qr_layout:layout}),event.id]);
+  return layout;
+ });
 }
 
-export async function replaceQrBackground(db,files,events,user,eventId,data){
+export async function replaceQrBackground(db,files,events,user,eventId,data,validateImage){
  requireThat(typeof data==='string'&&data.length<12*1024**2,413,'Choose a smaller QR background.');
  const initial=await events.own(user,eventId);
  let image;
- try{image=await sharp(Buffer.from(data,'base64'),{limitInputPixels:40e6,failOn:'warning'}).rotate().resize({width:3200,height:3200,fit:'inside',withoutEnlargement:true}).webp({quality:90}).toBuffer();}
+ try{const source=Buffer.from(data,'base64');if(validateImage){await validateImage(source);image=source;}else{const sharp=await loadSharp();image=await sharp(source,{limitInputPixels:40e6,failOn:'warning'}).rotate().resize({width:3200,height:3200,fit:'inside',withoutEnlargement:true}).webp({quality:90}).toBuffer();}}
  catch{throw new Fault(415,'This QR background could not be opened. Use JPEG, PNG or WebP.');}
  const key=`${initial.storage_prefix}/qr/${uuid()}.webp`,cleanupId=uuid();
  await db.query("insert into jobs(id,owner_id,event_id,type,payload,available_at) values($1,$2,$3,'object-cleanup',$4,now()+interval '10 minutes')",[cleanupId,user.id,eventId,JSON.stringify({keys:[key]})]);
  await files.put(key,image);
  await db.transaction(async tx=>{
   const event=await events.own(user,eventId,tx);
-  requireThat(['draft','published'].includes(event.status)&&Date.parse(event.ends_at)>Date.now(),409,'A completed or archived event cannot be redesigned.');
-  await tx.query('update events set appearance=appearance||$1::jsonb where id=$2',[JSON.stringify({qr_background_key:key}),event.id]);
+  requireThat(['draft','published'].includes(event.status)&&Date.parse(event.retention_at)>Date.now(),409,'This event can no longer be redesigned.');
+  await tx.query('update events set appearance=$1::jsonb where id=$2',[JSON.stringify({...event.appearance,qr_background_key:key}),event.id]);
   await tx.query('delete from jobs where id=$1',[cleanupId]);
   if(event.appearance.qr_background_key)await tx.query("insert into jobs(id,owner_id,event_id,type,payload) values($1,$2,$3,'object-cleanup',$4)",[uuid(),user.id,eventId,JSON.stringify({keys:[event.appearance.qr_background_key]})]);
  });

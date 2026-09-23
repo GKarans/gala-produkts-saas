@@ -1,5 +1,12 @@
 # Lumiq.cam izvietošanas ceļvedis
 
+> **Novecojis ceļvedis. Neizpildi pašreizējā izvietošanā.** Šis fails apraksta
+> Render `starter` servisus un piesaisti domēnam `lumiq.cam`, kas var radīt
+> izmaksas un pārņemt esošo domēnu. Pašreizējais īpašnieka lēmums ir tikai
+> bezmaksas slēgts tests, bez publiska domēna un bez maksas servisiem. Izmanto
+> [CLOSED-FREE-TEST.md](CLOSED-FREE-TEST.md). Šo ceļvedi saglabā kā vēsturisku
+> atsauci; tas nav apstiprināts production plāns.
+
 Šis ceļvedis pieslēdz `lumiq.cam` šim repozitorijam (`gala-produkts-saas`), izmantojot Namecheap domēna reģistrāciju, Cloudflare DNS/R2, Supabase DB/Auth un Render Node.js API/worker.
 
 **Maksājumi netiek pieslēgti.** Explore bezmaksas izmēģinājums, konti, pasākumi, viesu lapas, foto augšupielāde, privātā galerija, kopīgošana, eksports, e-pasti un fona darbi ir paredzēti darbam. Maksas checkout un norēķinu portāls paliek izslēgti.

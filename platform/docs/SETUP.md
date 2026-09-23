@@ -1,5 +1,11 @@
 # Lumiq: pieslegsana soli pa solim
 
+> **Vēsturiskas instrukcijas.** Šis dokuments apraksta Node/Render modeli un
+> daļēji vairs neatbilst pašreizējam Cloudflare Worker izvietojumam. Pašreiz
+> atļauts tikai bezmaksas, slēgts tests. Neizveido Render servisus, nemaini
+> `lumiq.cam` DNS un nepieslēdz staging resursus jaunajam testam. Skati
+> [CLOSED-FREE-TEST.md](CLOSED-FREE-TEST.md) un [PRODUCTION-COST-PLAN.md](PRODUCTION-COST-PLAN.md).
+
 Statuss: lokals pirmsizlaides produkts. Nekas no si dokumenta nav izpildits makoni.
 MVP projekts, ta Supabase, bucket `app-images`, Worker un Netlify vietne paliek neaiztikti.
 Neveidot maksajumus, apmaksatus abonementus vai resursus, pirms ipasnieks tos atseviski apstiprina.

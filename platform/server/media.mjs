@@ -1,5 +1,5 @@
 import {uuid,text,requireThat,hash} from './security.mjs';
-import sharp from 'sharp';
+import {loadSharp} from './image-runtime.mjs';
 import {DateTime} from 'luxon';
 import {eventState} from '../shared/plans.js';
 
@@ -10,7 +10,7 @@ function decodeCursor(value){
  catch(error){if(error?.status)throw error;requireThat(false,400,'Invalid gallery cursor.');}
 }
 
-export function mediaService(db,files,events){
+export function mediaService(db,files,events,validateImage=async bytes=>{const sharp=await loadSharp();await sharp(bytes,{limitInputPixels:40e6}).raw().toBuffer();}){
  const ready=async id=>{const m=(await db.query('select * from media where id=$1',[id])).rows[0];requireThat(m,404,'Photo not found.');return m;};
  return {
   ready,
@@ -31,7 +31,7 @@ export function mediaService(db,files,events){
    });
   },
   async upload(e,g,id,kind,bytes){const m=await ready(id);requireThat(m.event_id===e.id&&m.guest_id===g.id&&m.status==='pending'&&eventState(e)==='live',409,'This upload is no longer available.');const thumb=kind==='thumb';requireThat(['thumb','photo'].includes(kind),400,'Invalid photo variant.');requireThat(bytes.length===Number(thumb?m.thumbnail_bytes:m.bytes)&&hash(bytes)===(thumb?m.thumbnail_checksum:m.checksum),400,'The photo changed during upload. Try again.');requireThat(bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WEBP',415,'Upload a supported photo.');await files.put(thumb?m.thumbnail_key:m.object_key,bytes);return{ok:true};},
-  async finalize(e,g,id){const m=await ready(id);requireThat(m.event_id===e.id&&m.guest_id===g.id&&m.status!=='deleted',409,'This event is closed. The photo was not completed.');if(m.status==='uploaded')return{ok:true};requireThat(eventState(e)==='live',409,'This event is closed. The photo was not completed.');for(const[k,h]of[[m.object_key,m.checksum],[m.thumbnail_key,m.thumbnail_checksum]]){let bytes;try{bytes=await files.get(k);}catch{requireThat(false,409,'Both photo files must finish uploading.');}requireThat(hash(bytes)===h,409,'Photo verification failed. Try again.');try{await sharp(bytes,{limitInputPixels:40e6}).raw().toBuffer();}catch{requireThat(false,415,'This file is not a valid photo.');}}const result=await db.query("update media set status='uploaded' where id=$1 and status='pending' and exists(select 1 from events where id=$2 and status='published' and paused=false and starts_at<=now() and ends_at>now()) returning id",[id,e.id]);if(!result.rows.length)requireThat((await ready(id)).status==='uploaded',409,'The event closed while the photo was being verified.');if(result.rows.length)await db.query("insert into metrics(id,event_id,kind,amount) values($1,$2,'upload-completed',1)",[uuid(),e.id]);return{ok:true};},
+  async finalize(e,g,id){const m=await ready(id);requireThat(m.event_id===e.id&&m.guest_id===g.id&&m.status!=='deleted',409,'This event is closed. The photo was not completed.');if(m.status==='uploaded')return{ok:true};requireThat(eventState(e)==='live',409,'This event is closed. The photo was not completed.');for(const[k,h]of[[m.object_key,m.checksum],[m.thumbnail_key,m.thumbnail_checksum]]){let bytes;try{bytes=await files.get(k);}catch{requireThat(false,409,'Both photo files must finish uploading.');}requireThat(hash(bytes)===h,409,'Photo verification failed. Try again.');try{await validateImage(bytes);}catch{requireThat(false,415,'This file is not a valid photo.');}}const result=await db.query("update media set status='uploaded' where id=$1 and status='pending' and exists(select 1 from events where id=$2 and status='published' and paused=false and starts_at<=now() and ends_at>now()) returning id",[id,e.id]);if(!result.rows.length)requireThat((await ready(id)).status==='uploaded',409,'The event closed while the photo was being verified.');if(result.rows.length)await db.query("insert into metrics(id,event_id,kind,amount) values($1,$2,'upload-completed',1)",[uuid(),e.id]);return{ok:true};},
   async list(e,params,{owner=false}={}){
    requireThat(Date.parse(e.retention_at)>Date.now(),410,'Photo retention has ended. This event is archived and its photos are no longer available.');
    const guest=params.get('guest')||'',date=params.get('date')||'',cursor=decodeCursor(params.get('cursor'));

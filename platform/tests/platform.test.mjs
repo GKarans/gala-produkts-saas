@@ -21,8 +21,11 @@ test('full isolated customer, photo and export flow',async t=>{
  await t.test('register, verify once, login and session',async()=>{assert.equal((await call('/auth/register',{name:'Owner',email:'owner@example.test',password:'Test-password-123!'})).r.status,200);assert.equal((await call('/auth/login',{email:'owner@example.test',password:'Test-password-123!'})).r.status,403);const inbox=await call('/local/inbox'),token=new URL(inbox.data[0].body).searchParams.get('token');assert.equal((await call('/auth/consume',{token})).r.status,200);assert.equal((await call('/auth/consume',{token})).r.status,400);const login=await call('/auth/login',{email:'owner@example.test',password:'Test-password-123!'});cookie=login.r.headers.get('set-cookie').split(';')[0];assert((await call('/auth/session')).data.user);});
  await t.test('draft preview and editable QR designs are safe and readable',async()=>{
   const start=new Date(Date.now()-3600000).toISOString().slice(0,16),end=new Date(Date.now()+3600000).toISOString().slice(0,16);
-  e=(await call('/events',{name:'Integration party',start,end,time_zone:'UTC'})).data;
+  e=(await call('/events',{name:'Integration party',start,end,time_zone:'UTC',cover:'/assets/garden-gathering.webp'})).data;
   assert(e.id);
+  const coverChange=await call(`/events/${e.id}`,{name:e.name,description:e.description,start,end,time_zone:'UTC',cover:'/assets/party.webp'},'PATCH');
+  assert.equal(coverChange.data.appearance.cover,'/assets/party.webp');
+  e=coverChange.data;
   const preview=(await call(`/events/${e.id}/preview`,{})).data,previewUrl=new URL(preview.url),secret=previewUrl.searchParams.get('preview');
   assert.equal(preview.expires_in,900);
   const page=await call(`/guest/${e.slug}?preview=${encodeURIComponent(secret)}`);
@@ -33,33 +36,36 @@ test('full isolated customer, photo and export flow',async t=>{
   for(const template of ['garden','vintage','celebration','modern']){
    const response=await app.handle(new Request(`${origin}/api/events/${e.id}/qr?format=table&template=${template}`,{headers:{Origin:origin,Cookie:cookie}}));
    assert.equal(response.status,200);
-   assert.equal(response.headers.get('content-type'),'image/png');
+   assert.equal(response.headers.get('content-type'),'image/svg+xml');
    assert.equal(response.headers.get('content-disposition'),null);
-   const poster=Buffer.from(await response.arrayBuffer()),metadata=await sharp(poster).metadata();
-   assert.equal(metadata.width,2480);
-   assert.equal(metadata.height,1748);
-   assert(poster.length>10000);
+   const poster=await response.text();
+   assert.match(poster,/width="210mm" height="148mm" viewBox="0 0 2480 1748"/);
+   assert.match(poster,/<path stroke="#000" d="M/);
+   assert.match(poster,/LUMIQ/);
+   assert(poster.length>1000);
   }
   const saved=(await call(`/events/${e.id}/qr-layout`,{template:'modern',font:'montserrat',titleSize:999,textX:-5,textY:.2,qrX:.72,qrY:.65,qrScale:1.18})).data;
   assert.deepEqual(saved,{template:'modern',font:'montserrat',titleSize:104,textX:.18,textY:.2,qrX:.72,qrY:.65,qrScale:1.18});
   assert.deepEqual((await call(`/events/${e.id}`)).data.appearance.qr_layout,saved);
   const download=await app.handle(new Request(`${origin}/api/events/${e.id}/qr?format=table&download=1`,{headers:{Origin:origin,Cookie:cookie}}));
-  assert.match(download.headers.get('content-disposition'),/^attachment;/);
+  assert.match(download.headers.get('content-disposition'),/^attachment; filename="modern-design-/);
   const standalone=await app.handle(new Request(`${origin}/api/events/${e.id}/qr?format=qr`,{headers:{Origin:origin,Cookie:cookie}}));
   assert.equal(standalone.status,200);
-  assert.equal((await sharp(Buffer.from(await standalone.arrayBuffer())).metadata()).width,1200);
+  assert.equal(standalone.headers.get('content-type'),'image/svg+xml');
+  assert.match(await standalone.text(),/viewBox="0 0 \d+ \d+"/);
   const unsupported=await app.handle(new Request(`${origin}/api/events/${e.id}/qr?format=a5`,{headers:{Origin:origin,Cookie:cookie}}));
   assert.equal(unsupported.status,400);
   const background=await sharp({create:{width:600,height:900,channels:3,background:'#d7e7dd'}}).png().toBuffer();
   assert.equal((await call(`/events/${e.id}/qr-background`,{data:background.toString('base64')})).r.status,200);
   const custom=await app.handle(new Request(`${origin}/api/events/${e.id}/qr?format=table&template=custom`,{headers:{Origin:origin,Cookie:cookie}}));
   assert.equal(custom.status,200);
+  assert.equal(custom.headers.get('content-type'),'image/webp');
   const customMetadata=await sharp(Buffer.from(await custom.arrayBuffer())).metadata();
   assert.equal(customMetadata.width,600);
   assert.equal(customMetadata.height,900);
  });
  await t.test('publish, pause and guest entry',async()=>{assert.equal((await call(`/events/${e.id}/action`,{action:'publish'})).r.status,200);assert.equal((await call('/admin')).r.status,403);await call(`/events/${e.id}/action`,{action:'pause'});assert.equal((await call(`/guest/${e.slug}/join`,{name:'Blocked'})).r.status,409);await call(`/events/${e.id}/action`,{action:'resume'});g=(await call(`/guest/${e.slug}/join`,{name:'Guest One'})).data;assert(g.token);});
- await t.test('file pair validation, stable retries, gallery isolation',async()=>{const photo=await sharp({create:{width:80,height:60,channels:3,background:'#397755'}}).webp().toBuffer();mid=uuid();const body={id:mid,name:'test.webp',bytes:photo.length,thumbnail_bytes:photo.length,checksum:hash(photo),thumbnail_checksum:hash(photo)},headers={'X-Guest-Token':g.token};const r=await call(`/guest/${e.slug}/reserve`,body,'POST',headers);assert.equal(r.r.status,200);assert.match(r.data.object_key,/integration-party--.*\/guests\/guest-one--/);assert.equal((await call(`/guest/${e.slug}/reserve`,body,'POST',headers)).data.object_key,r.data.object_key);assert.equal((await call(`/guest/${e.slug}/finalize`,{id:mid},'POST',headers)).r.status,409);for(const kind of ['photo','thumb'])assert.equal((await app.handle(new Request(`${origin}/api/guest/${e.slug}/content/${mid}/${kind}`,{method:'PUT',headers:{Origin:origin,...headers},body:photo}))).status,200);assert.equal((await call(`/guest/${e.slug}/finalize`,{id:mid},'POST',headers)).r.status,200);assert.equal((await call(`/guest/${e.slug}/finalize`,{id:mid},'POST',headers)).r.status,200);assert.equal((await call(`/events/${e.id}/photos`)).data.total,1);assert.equal((await app.handle(new Request(`${origin}/api/photos/${mid}/photo`))).status,403);});
+ await t.test('file pair validation, stable retries, gallery isolation',async()=>{const photo=await sharp({create:{width:80,height:60,channels:3,background:'#397755'}}).webp().toBuffer();mid=uuid();const body={id:mid,name:'test.webp',bytes:photo.length,thumbnail_bytes:photo.length,checksum:hash(photo),thumbnail_checksum:hash(photo)},headers={'X-Guest-Token':g.token};const r=await call(`/guest/${e.slug}/reserve`,body,'POST',headers);assert.equal(r.r.status,200);assert.match(r.data.object_key,/events\/integration-party--.*\/guest-one--.*\/photo-/);assert.doesNotMatch(r.data.object_key,/\/guests\//);assert.equal((await call(`/guest/${e.slug}/reserve`,body,'POST',headers)).data.object_key,r.data.object_key);assert.equal((await call(`/guest/${e.slug}/finalize`,{id:mid},'POST',headers)).r.status,409);for(const kind of ['photo','thumb'])assert.equal((await app.handle(new Request(`${origin}/api/guest/${e.slug}/content/${mid}/${kind}`,{method:'PUT',headers:{Origin:origin,...headers},body:photo}))).status,200);assert.equal((await call(`/guest/${e.slug}/finalize`,{id:mid},'POST',headers)).r.status,200);assert.equal((await call(`/guest/${e.slug}/finalize`,{id:mid},'POST',headers)).r.status,200);assert.equal((await call(`/events/${e.id}/photos`)).data.total,1);assert.equal((await app.handle(new Request(`${origin}/api/photos/${mid}/photo`))).status,403);});
  await t.test('sharing revokes access, exports survive reload',async()=>{await db.query("update events set starts_at=now()-interval '2 hours',ends_at=now()-interval '1 hour' where id=$1",[e.id]);assert.equal((await call(`/events/${e.id}/action`,{action:'share',enabled:true,days:4})).r.status,200);assert.equal((await call(`/guest/${e.slug}/photos`)).data.total,1);await call(`/events/${e.id}/action`,{action:'share',enabled:false,days:4});assert.equal((await call(`/guest/${e.slug}/photos`)).r.status,403);const job=(await call(`/events/${e.id}/export`,{})).data;await app.jobs.tick();const ready=(await call(`/jobs/${job.id}`)).data;assert.equal(ready.status,'ready');assert.equal(ready.result.count,1);assert.equal((await call(`/events/${e.id}/export`,{})).data.id,job.id);});
  await t.test('verified payment simulation and deduplication',async()=>{const o=(await call('/billing/checkout',{plan:'gathering'})).data;assert.equal((await call('/billing')).data.subscription.plan,'trial');assert.equal((await call('/billing/simulate',{order:o.order,outcome:'success'})).r.status,200);assert.equal((await call('/billing/simulate',{order:o.order,outcome:'success'})).data.duplicate,true);assert.equal((await call('/billing')).data.subscription.plan,'gathering');await call('/billing/cancel',{});assert.equal((await call('/billing')).data.subscription.cancel_at_end,true);});
  await t.test('CSRF and wrong-account access denied',async()=>{await call('/auth/register',{name:'Other',email:'other@example.test',password:'Test-password-123!'});const mail=(await call('/local/inbox')).data.find(m=>m.recipient==='other@example.test');await call('/auth/consume',{token:new URL(mail.body).searchParams.get('token')});const login=await call('/auth/login',{email:'other@example.test',password:'Test-password-123!'});assert.equal((await call(`/events/${e.id}`,null,'GET',{Cookie:login.r.headers.get('set-cookie').split(';')[0]})).r.status,404);assert.equal((await app.handle(new Request(origin+`/api/events/${e.id}/action`,{method:'POST',headers:{Origin:'https://attacker.invalid',Cookie:cookie},body:JSON.stringify({action:'delete',confirm:e.name})}))).status,403);});

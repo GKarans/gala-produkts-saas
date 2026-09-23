@@ -2,7 +2,7 @@
 
 ## Scope
 
-The backup contains a PostgreSQL custom-format dump, every private R2 object, and a manifest with object sizes and SHA-256 checksums. Credentials are read only from the process environment and never written to the archive.
+The backup contains a PostgreSQL custom-format dump, every private R2 object, and a manifest with database/object sizes and SHA-256 checksums. Verification rejects missing integrity metadata, altered files, size mismatches and paths escaping the backup directory. Credentials are read only from the process environment and never written to the archive.
 
 ## Backup
 
@@ -15,7 +15,7 @@ The backup contains a PostgreSQL custom-format dump, every private R2 object, an
 ## Restore drill
 
 1. Create a new empty Supabase drill project and a new empty private R2 bucket. Never target production or staging.
-2. Load only the drill credentials and set `PLATFORM_RESTORE_DRILL=EMPTY-ISOLATED-TARGET`.
+2. Load only the new drill project's credentials and set `PLATFORM_RESTORE_DRILL=EMPTY-ISOLATED-TARGET` plus `PLATFORM_RESTORE_TARGET_REF` to the exact project reference. The script verifies that reference against the PostgreSQL URL, validates the backup before writes, and refuses any non-empty public schema or R2 bucket.
 3. Run `npm run restore:drill -- D:\secure-backups\lumiq-staging-YYYY-MM-DD`.
 4. Run migrations, start web and worker services against the drill targets, then test login, event ownership, thumbnails, full photos and one ZIP export.
 5. Compare database row counts and sampled object SHA-256 values with the manifest. Destroy the drill environment after evidence is retained.

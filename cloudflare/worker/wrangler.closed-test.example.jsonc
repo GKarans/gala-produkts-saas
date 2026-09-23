@@ -1,0 +1,46 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "lumiq-closed-test",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-22",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env"
+  ],
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "PLATFORM_MODE": "staging",
+    "PLATFORM_RELEASE_APPROVED": "staging",
+    "PLATFORM_ORIGIN": "https://lumiq-closed-test.<your-workers-subdomain>.workers.dev",
+    "R2_BUDGET_ENABLED": "true",
+    "R2_MAX_CLASS_A_OPS_MONTH": "10000",
+    "R2_MAX_CLASS_B_OPS_MONTH": "100000",
+    "R2_MAX_LIFETIME_WRITE_BYTES": "2147483648",
+    "R2_MAX_STREAM_WRITE_BYTES": "73400320"
+  },
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
+  "assets": {
+    "directory": "../../platform/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/healthz", "/api/*"]
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "REPLACE_WITH_CLOSED_TEST_HYPERDRIVE_ID"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "R2_PHOTOS",
+      "bucket_name": "lumiq-closed-test-photos"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

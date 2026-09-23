@@ -135,8 +135,15 @@ test('Supabase adapter keeps provider tokens encrypted and out of browser cookie
  const db=await openDatabase({memory:true}),before={...process.env},id=uuid();
  try{
   Object.assign(process.env,{PLATFORM_SUPABASE_URL:'https://isolated-fixture.supabase.co',PLATFORM_SUPABASE_PUBLISHABLE_KEY:'fixture',PLATFORM_SESSION_ENCRYPTION_KEY:'12'.repeat(32)});
-  const user={id,email:'auth@example.test',email_confirmed_at:new Date().toISOString(),user_metadata:{name:'Auth'}};
-  let tokenRequest;const service=supabaseAuthService(db,{origin:'https://staging.example.test',mail:async()=>{},fetcher:async(url,options)=>{if(url.includes('grant_type=pkce'))tokenRequest=JSON.parse(options.body);return Response.json(url.endsWith('/user')?user:{user,access_token:'private-access-fixture',refresh_token:'private-refresh-fixture',expires_at:Math.floor(Date.now()/1000)+3600});}});
+  const user={id,email:'auth@example.test',email_confirmed_at:new Date().toISOString(),user_metadata:{name:'Auth',profile:{first_name:'Anna',last_name:'Test',phone_country:'LV',phone:'',account_type:'personal',company_name:''}}};
+  let tokenRequest,signupRequest,signupUrl,resetUrl;const service=supabaseAuthService(db,{origin:'https://staging.example.test',mail:async()=>{},fetcher:async(url,options)=>{if(url.includes('/signup?')){signupRequest=JSON.parse(options.body);signupUrl=new URL(url);}if(url.includes('/recover?'))resetUrl=new URL(url);if(url.includes('grant_type=pkce'))tokenRequest=JSON.parse(options.body);return Response.json(url.endsWith('/user')?user:{user,access_token:'private-access-fixture',refresh_token:'private-refresh-fixture',expires_at:Math.floor(Date.now()/1000)+3600});}});
+  await service.register({first_name:'Anna',last_name:'Test',phone_country:'LV',phone:'',account_type:'personal',email:user.email,password:'Test-password-123!'});
+  assert.equal(signupUrl.searchParams.get('redirect_to'),'https://staging.example.test/auth/verify');
+  await service.requestReset({email:user.email});assert.equal(resetUrl.searchParams.get('redirect_to'),'https://staging.example.test/auth/reset');
+  assert.equal(signupRequest.data.name,'Anna Test');assert.equal(signupRequest.data.profile.first_name,'Anna');
+  const confirmed=await service.consume({access_token:'confirmed-access-fixture',refresh_token:'confirmed-refresh-fixture',expires_in:'3600',type:'signup',purpose:'verify'});
+  assert.match(confirmed.cookie,/HttpOnly; SameSite=Lax; Secure/);assert.doesNotMatch(JSON.stringify(confirmed),/confirmed-access|confirmed-refresh/);
+  await assert.rejects(service.consume({access_token:'confirmed-access-fixture',refresh_token:'confirmed-refresh-fixture',type:'recovery',purpose:'verify'}),/invalid/);
   const start=service.googleStart(),authorize=new URL(start.url),oauthCookie=start.cookie.split(';')[0];assert.equal(authorize.searchParams.get('provider'),'google');assert.equal(authorize.searchParams.get('code_challenge_method'),'s256');assert(authorize.searchParams.get('code_challenge'));assert.doesNotMatch(start.url,/verifier/);assert.match(start.cookie,/HttpOnly; SameSite=Lax; Secure/);
   const state=authorize.searchParams.get('state');await assert.rejects(service.googleCallback(new Request('https://staging.example.test',{headers:{Cookie:oauthCookie}}),new URL(`https://staging.example.test/api/auth/google/callback?state=tampered&code=fixture`)),/invalid/);
   const oauth=await service.googleCallback(new Request('https://staging.example.test',{headers:{Cookie:oauthCookie}}),new URL(`https://staging.example.test/api/auth/google/callback?state=${encodeURIComponent(state)}&code=fixture`));assert(tokenRequest.code_verifier);assert.match(oauth.cookie,/HttpOnly; SameSite=Lax; Secure/);assert.match(oauth.clear,/Max-Age=0/);assert.doesNotMatch(oauth.cookie,/private-access|private-refresh/);
@@ -144,6 +151,6 @@ test('Supabase adapter keeps provider tokens encrypted and out of browser cookie
   assert.match(login.cookie,/HttpOnly; SameSite=Lax; Secure/);assert.doesNotMatch(login.cookie,/private-access|private-refresh/);
   const row=(await db.query('select * from sessions')).rows[0];assert.doesNotMatch(row.provider_session,/private-access|private-refresh/);
   const request=new Request('https://staging.example.test',{headers:{Cookie:login.cookie.split(';')[0]}});
-  assert.equal((await service.user(request)).id,id);await service.logout(request);assert.equal(await service.user(request),null);
+  assert.equal((await service.user(request)).id,id);const account=(await db.query('select profile from accounts where id=$1',[id])).rows[0];assert.equal(account.profile.first_name,'Anna');assert.equal(account.profile.last_name,'Test');await service.logout(request);assert.equal(await service.user(request),null);
  }finally{for(const key of ['PLATFORM_SUPABASE_URL','PLATFORM_SUPABASE_PUBLISHABLE_KEY','PLATFORM_SESSION_ENCRYPTION_KEY']){if(before[key]===undefined)delete process.env[key];else process.env[key]=before[key];}await db.close();}
 });

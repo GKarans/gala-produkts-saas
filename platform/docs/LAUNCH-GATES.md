@@ -2,13 +2,22 @@
 
 No public-sales readiness claim is made. These checks must be completed before enabling production. None requires spending money without a separate owner decision.
 
+The runtime accepts `PLATFORM_RELEASE_APPROVED=staging` only with
+`PLATFORM_MODE=staging`, or `PLATFORM_RELEASE_APPROVED=production` only with
+`PLATFORM_MODE=production`. Set the production pair only after every required
+engineering and owner-dependent gate below has dated evidence and explicit
+owner approval. A matching environment flag is a release switch, not proof that
+the gates passed.
+
 ## Engineering work still requiring completion or target-environment evidence
 
-- [ ] Isolated Supabase integration: fresh schema, restricted DB role, anon table denial, Auth email templates, reset/change-email and concurrent refresh.
+- [x] Closed-test database foundation only: migrations `001-platform` through `006-r2-usage-guard`, RLS on all 17 protected tables, anon/authenticated SELECT denied, and restricted `lumiq_runtime` role provisioned and privilege-checked. Evidence: owner ran `migrate-new-test.ps1` and `provision-test-db-role.ps1` against the separate Free test project on 2026-09-23. This is not production evidence.
+- [x] Closed-test Hyperdrive connectivity: owner-authenticated `/healthz` returned `status: ok`, `database: ready`, and `storage: bound` on 2026-09-23. Wrangler showed Worker version `6d2820c4-619e-46a6-8aee-49f3dab6139c` at 100%. This proves Worker startup checks and a database query through the separate test Hyperdrive; it is not production evidence.
+- [ ] Closed-test Supabase Auth integration: verify test-only callback URLs, email templates, reset/change-email and concurrent refresh. Do not reuse staging Auth settings.
 - [ ] Isolated R2 integration: preflight, signed PUT checksum/size enforcement, expired URL retry, private GET denial, finalize and immediate share revocation.
 - [ ] Prove the implemented DB-shared limiter and trusted proxy/client-IP handling on the actual multi-instance staging deployment.
 - [ ] Stripe sandbox renewal, delayed payment, changed plan, cancellation, taxes/invoices, failed payment, duplicate/out-of-order delivery and reconciliation. The local mock is not this evidence.
-- [ ] Run the implemented numbered migration/checksum procedure against the new PostgreSQL target, including upgrade and backup/restore evidence.
+- [ ] Run the implemented numbered migration/checksum procedure against the production PostgreSQL target, including upgrade and backup/restore evidence. The closed-test schema was applied and verified, but no MVP migration or production migration was run.
 - [ ] Upload memory profile on an older device with 20 mixed large JPEG/PNG/WebP and HEIC/HEIF files. Verify bounded server conversion, explicit fallback errors and IndexedDB queue recovery after refresh without persisting guest tokens.
 - [ ] Validate alert webhook delivery, request-to-job correlation, failure classification and costs/support per event in staging. Structured logs, request IDs, health checks and alert hooks are implemented; provider dashboards still need target-environment evidence.
 - [ ] Capacity test for maximum advertised event/ZIP allowances. Tune batching, worker memory and lease behavior with measurements.
@@ -23,9 +32,9 @@ No public-sales readiness claim is made. These checks must be completed before e
 3. Interview at least three target organizers. Compare occasional event passes with the current monthly test proposal; select one launch offer.
 4. Measure storage/operations/API hosting/email/payment fees and support time. Set prices and a contingency margin only after those inputs exist.
 5. Approve privacy notice, terms, refund/withdrawal rules, tax treatment, subprocessors, regions, retention, deletion/backup windows and rights-request process with qualified advice.
-6. Configure NEW service resources following SETUP.md. Decline any purchase or subscription not separately approved.
+6. For the approved $0 closed test only, finish the separate test Hyperdrive, Access allowlist, Worker configuration/secrets and protected deployment in `CLOSED-FREE-TEST.md`. Production resources are not approved or provisioned; obtain a separate owner decision before creating or changing any production resource or paid plan.
 7. Nominate an operator admin through a controlled backend procedure, not a browser role field. No demo admin is imported into staging.
-8. Protect staging from public discovery and real customer use until testing finishes. Do not publish a draft privacy policy as legally approved.
+8. Protect staging from public discovery and real customer use until testing finishes. Keep the closed-test Worker behind Access. Do not publish a draft privacy policy as legally approved.
 
 ## Physical-device script
 
