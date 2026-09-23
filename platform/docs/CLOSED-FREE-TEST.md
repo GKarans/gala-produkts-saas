@@ -140,8 +140,13 @@ limit.
    guard enabled. Anonymous `/` and `/healthz` still return Access 302 after
    deployment. The owner rechecked authenticated `/healthz` on this version
    and confirmed the draft event `Balle` remained available after returning to
-   the app. Still verify auth callbacks use only the test URL and requests
-   cannot reach staging data.
+   the app. A code audit confirmed the Worker passes configured
+   `PLATFORM_ORIGIN` into Supabase Auth and the closed-test config uses only the
+   test `workers.dev` origin. The local Supabase adapter regression suite passed
+   14/14 tests on 2026-09-23, including signup, password-reset and OAuth redirect
+   construction from the supplied origin. Supabase's actual redirect allowlist,
+   email templates, live recovery/OAuth flows and staging-data isolation remain
+   unverified.
 9. Initially test registration, login, event creation, guest page and QR with
    no cloud photos. The Worker R2 adapter now has an app-side monthly operation
    ceiling and lifetime write-byte ceiling, including Class A object deletion;
@@ -155,6 +160,11 @@ limit.
    showed `lumiq-closed-test-photos`: 0 objects / 0 B and
    `lumiq-staging-photos`: 11 objects / 502 kB. These are per-bucket counts;
    they do not establish account-wide storage or Class A/B operation usage.
+   The owner dashboard screenshot for `lumiq-closed-test-photos`, last 24 hours
+   on 2026-09-23, showed average storage 0 B, data retrieved 0 B, 3 Class A
+   operations, 12 Class B operations and request distribution 9. This is a
+   one-bucket 24-hour baseline only; it is not the account/month total and does
+   not by itself authorize a photo upload.
 
 ## Not yet ready to deploy
 
@@ -183,7 +193,9 @@ limit.
   Worker version `636cb1e2-2e0e-49d3-914e-47f335f0239f` was deployed, the owner
   rechecked `/healthz` through Access and confirmed database/storage readiness;
   the owner also confirmed draft event `Balle` persisted after returning to
-  the app. Auth recovery and staging-data isolation are still unverified.
+  the app. Code-side Auth redirect checks passed 14/14 locally and use the
+  configured test origin; the Supabase dashboard allowlist, email templates,
+  live recovery/OAuth and staging-data isolation remain unverified.
 - `PLATFORM_SESSION_ENCRYPTION_KEY`, `PLATFORM_SUPABASE_URL` and
   `PLATFORM_SUPABASE_PUBLISHABLE_KEY` are configured as Worker Secrets. The
   owner verified `/healthz` through Access and the Supabase/Hyperdrive query
