@@ -32,14 +32,14 @@ milestones, not permission to expose the current closed-test Worker publicly:
 
 1. The owner-approved pre-company transition has been completed as a closed
    pilot on isolated test resources behind an allowlisted Cloudflare Access
-   policy. The latest diagnostic request pinned to a Cloudflare IP and the
-   closed-test `workers.dev` request passed normal TLS and received the expected
-   Access challenge. The ordinary `lumiq.cam` request failed Windows Schannel
-   verification with `SEC_E_UNTRUSTED_ROOT`, despite default DNS matching
-   Cloudflare. Authenticated app/Auth flow is not yet verified. Tet's earlier
-   security warning was not reproduced in this probe; no official Tet
-   classification clearance has been received. Keep the service closed and
-   never bypass a certificate or security warning.
+   policy. On 2026-09-25 18:51 UTC, normal DNS resolution returned Cloudflare
+   IPs and ordinary `curl.exe -I` TLS validation succeeded for both `lumiq.cam`
+   and the closed-test `workers.dev`; both returned the expected Access
+   challenge. The earlier Windows Schannel `SEC_E_UNTRUSTED_ROOT` did not
+   reproduce in this local probe. Authenticated app/Auth flow is not yet
+   verified. Tet's earlier security warning was not reproduced here; no
+   official Tet classification clearance has been received. Keep the service
+   closed and never bypass a certificate or security warning.
 2. After company registration and a fresh cost review explicitly approved by
    the owner, provision separate paid production resources and complete every
    production gate below before opening the service to customers.

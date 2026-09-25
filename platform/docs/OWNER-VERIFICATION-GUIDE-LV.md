@@ -13,11 +13,12 @@ neievieto čatā, ekrānattēlos vai Git.
 - `lumiq.cam` jau ir pārslēgts uz slēgtā testa Worker aiz Cloudflare Access;
   tam jāraksta tikai atsevišķajā closed-test DB/R2. Publiska reģistrācija,
   pārdošana un viesu foto pieņemšana nav atļauta. Tas nav production launch.
-  Tet Drošība iepriekš rādīja `Malware`. 2026-09-25 17:05 UTC DNS atbildes
-  sakrita ar Cloudflare, bet parastais `curl` atkal saņēma
-  `SEC_E_UNTRUSTED_ROOT`; piesaistīts Cloudflare IP ar normālu TLS pārbaudi
-  atgrieza Access 302, tāpat arī testa `workers.dev`. Kļūdas cēlonis un Tet
-  oficiālais vērtējums nav noskaidrots. Ja brīdinājums atgriežas, to neapiet
+  Tet Drošība iepriekš rādīja `Malware`. 2026-09-25 18:51 UTC lokālais
+  `Resolve-DnsName` saņēma Cloudflare IP adreses, un parastais `curl.exe -I`
+  ar sertifikāta pārbaudi sekmīgi pabeidza TLS uz `lumiq.cam` un testa
+  `workers.dev`; abi atgrieza gaidīto Cloudflare Access `302`. Iepriekšējais
+  `SEC_E_UNTRUSTED_ROOT` šajā pārbaudē neatkārtojās. Tas nepārbauda Tet
+  klasifikāciju vai citas ierīces/tīklus. Ja brīdinājums atgriežas, to neapiet
   un PIN tajā neievadi.
 - Pēc uzņēmuma reģistrācijas atgriezies pie `PRODUCTION-COST-PLAN.md`, saņem
   konkrēto ikmēneša izmaksu apstiprinājumu un tikai tad veido izolētos
@@ -213,11 +214,13 @@ Tet Drošība iepriekš rādīja `Malware` STOP lapu un agrāk noklusētais DNS
 atgrieza `195.122.12.177`. Pārbaudē 2026-09-25 17:05 UTC noklusētais DNS un
 `1.1.1.1` abi atgrieza Cloudflare IP adreses, taču parastais `curl` uz
 `lumiq.cam` neizgāja Windows Schannel TLS pārbaudi (`SEC_E_UNTRUSTED_ROOT`).
-Diagnostiski piesaistot `104.21.67.110` ar normālu sertifikāta pārbaudi,
-saņemts paredzētais Cloudflare Access `302`; testa `workers.dev` arī atgrieza
-`302` ar derīgu TLS. Tas neizslēdz lokālu vai tīkla TLS problēmu. Tet oficiāla
-klasifikācijas atbilde nav saņemta, un šis pieprasījums **nav domēna pilnas
-drošības apliecinājums**.
+Jaunā pārbaudē 2026-09-25 18:51 UTC `Resolve-DnsName` atgrieza
+`104.21.67.110` un `172.67.221.99`; parastais `curl.exe -I` uz `lumiq.cam`
+un testa `workers.dev` sekmīgi pabeidza TLS verifikāciju un saņēma paredzēto
+Cloudflare Access `302`. Iepriekšējā TLS kļūda šajā lokālajā pārbaudē
+neatkārtojās. Pārbaude neiet caur visiem ISP, ierīcēm vai Tet filtru. Tet
+oficiāla klasifikācijas atbilde nav saņemta, un šis pieprasījums **nav domēna
+pilnas drošības apliecinājums**.
 
 Tet apraksta Tīkla vairogu kā DNS līmeņa filtru, kas bloķē draudu sarakstos
 esošus resursus un rāda STOP lapu; pašapkalpošanās pārvaldībā ir atļautais
