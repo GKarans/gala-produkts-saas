@@ -129,7 +129,7 @@ limit.
 8. Build and deploy only with the separate test config, for example:
 
    For the current source, do not run the deployment until
-   `migrate-new-test.ps1` reports all 11 migrations verified. Queue bindings
+   `migrate-new-test.ps1` reports all 12 migrations verified. Queue bindings
    are intentionally absent for this first deployment; scheduled database
    polling remains enabled. Then run the local checks and inspect the dry-run
    bindings before the command below. The base `npm run cloudflare:deploy`
@@ -265,20 +265,20 @@ This section supersedes earlier pending statements above where the test state
 has since changed. It is still a closed test, not production approval.
 
 - The test-only Supabase Free database has migrations `001-platform` through
-  `011-queue-job-dispatch`; RLS is enabled on 17 platform tables and
+  `012-tier-photo-capacity`; RLS is enabled on 17 platform tables and
   `anon`/`authenticated` SELECT is denied. `lumiq_runtime` and the separate
   test Hyperdrive were provisioned and checked. No MVP migration or production
   migration was run. The test project reference is pinned in the migration
   guard; database credentials must never be copied into this repo.
-- The current source adds migration `012-tier-photo-capacity` and raises the
-  per-event byte allowances to 100 / 1000 / 1000 / 2000 MiB. Migration 012 is
-  not yet applied to the closed-test database and this source is not deployed;
-  apply the guarded test migration before deploying it, since Worker startup
-  requires every manifest version. Production remains untouched.
+- Migration `012-tier-photo-capacity` raises per-event byte allowances to
+  100 / 1000 / 1000 / 2000 MiB. The owner confirmed the guarded migrator
+  verified all 12 versions, with RLS enabled and anon/authenticated SELECT
+  denied on 17 tables; no MVP migration ran. The matching source was then
+  deployed to the closed-test Worker. Production remains untouched.
 - The separate closed-test Worker uses only its test Hyperdrive and private
   `lumiq-closed-test-photos` bucket. It remains behind the owner's Cloudflare
   Access policy. The latest read-only Wrangler listing on 2026-09-25 reports
-  version `79cf3383-7f49-475b-a9b5-b4e7fa2e5b5a` at 100%. Payments remain
+  version `0d6c9cd2-3d03-44bc-8bb5-a4591bde7fc9` at 100%. Payments remain
   disabled. The root `lumiq-cam` Worker is a separate staging deployment.
 - The owner applied the approved free, account-specific Gathering exception
   in the test database. The authenticated billing page showed `Gathering
