@@ -124,33 +124,44 @@ Izmanto divus testa organizatorus un vienu publicētu sintētisku notikumu katra
 
 ## 3. Rezerves kopijas atjaunošanas izmēģinājums
 
-Pašreizējam datoram trūkst `pg_dump` un `pg_restore`, un Docker dzinējs nebija
-pieejams. Šo soli veic tikai, kad tie ir uzstādīti/palaisti, un kad ir pieejams
-**atsevišķs tukšs** Supabase/R2 atjaunošanas mērķis. Nekad neatjauno esošajā
-closed-test DB vai bucketā.
+Avota closed-test DB ir PostgreSQL 17.6. Šajā datorā PostgreSQL 17.11 klienta
+arhīvs no oficiālās EDB binaries lapas ir izvilkts lietotāja profilā:
+`%LOCALAPPDATA%\Lumiq\postgresql17\bin`. `pg_dump --version` un
+`pg_restore --version` apstiprina 17.11; lokāls PostgreSQL serveris nav
+instalēts un PATH nav mainīts sistēmas līmenī. Pirms backup lokālajā
+PowerShell procesā pievieno klienta rīku mapi:
+`$env:PATH="$env:LOCALAPPDATA\Lumiq\postgresql17\bin;$env:PATH"`
+un pārbaudi abas versijas. Docker nav nepieciešams, ja šie rīki ir pieejami.
 
-1. Uzstādi PostgreSQL klienta rīkus, kuru `pg_dump`/`pg_restore` versija atbilst
-   avota PostgreSQL galvenajai versijai; PowerShell pārbaudi:
-   `Get-Command pg_dump,pg_restore`. Docker variantā vispirms palaid Docker
-   Desktop un sagaidi, līdz `docker info` beidzas bez kļūdas.
-2. Slēptā vietējā terminālī sagatavo avota DB Session Pooler URL (5432) un
-   slēgtā testa R2 lasīšanas atslēgas vides mainīgajos; izpildi
-   `npm run backup -- backups/lumiq-restore-drill`. Nekādas atslēgas čatā vai
-   `.env`/Git failā.
-3. Pārbaudi backup ar
-   `npm run backup:verify -- backups/lumiq-restore-drill`. Tam jāpārbauda
-   database dump, publisko tabulu inventārs un katra lokālā objekta kontrolsumma.
-4. Izveido jaunu tukšu atjaunošanas DB un atsevišķu tukšu R2 bucket. Pārbaudi
+Šo soli turpini tikai tad, kad backup avota piekļuve ievadāma drošā vietējā
+terminālī un ir pieejams **atsevišķs tukšs** Supabase/R2 atjaunošanas mērķis.
+Nekad neatjauno esošajā closed-test DB vai bucketā.
+
+1. Šim avotam vajag PostgreSQL 17.x klienta rīkus. Tie jau atrodas
+   `%LOCALAPPDATA%\Lumiq\postgresql17\bin`; iepriekšējā sadaļā norādītā PATH
+   komanda iestata tos tikai pašreizējai PowerShell sesijai.
+2. Izveido Cloudflare R2 API tokenu ar tikai Object Read atļauju, ierobežotu uz
+   `lumiq-closed-test-photos`. Sagatavo Supabase Session Pooler URL (ports 5432).
+   Nelīmē nekādus URL vai atslēgas čatā, `.env`, komandrindas argumentos vai Git.
+3. No repozitorija saknes atver PowerShell un palaid
+   `.\platform\scripts\backup-local.ps1`. Tas maskēti paprasīs avota savienojuma
+   vērtības, atļaus tikai norādīto testa bucketu, saglabās backup ārpus repozitorija
+   `%LOCALAPPDATA%\Lumiq\backups\` un palaidīs `backup:verify`. Beigās tas attīra
+   procesa vides mainīgos. Ja komanda neizdodas, nepalaid restore un neizdzēs
+   daļējo mapi; ziņo tikai nekonfidenciālo kļūdas tekstu.
+4. Verifierim jāpārbauda database dump, publisko tabulu inventārs un katra
+   lokālā R2 objekta kontrolsumma. Saglabā sekmīgi verificētās mapes ceļu.
+5. Izveido jaunu tukšu atjaunošanas DB un atsevišķu tukšu R2 bucket. Pārbaudi
    to projekta ID neatkarīgi. Nedrīkst būt tie paši target ID kā avotam.
-5. Slēptajā terminālī ievadi tikai jaunā mērķa URL/atslēgas, uzstādi
+6. Slēptajā terminālī ievadi tikai jaunā mērķa URL/atslēgas, uzstādi
    `PLATFORM_RESTORE_TARGET_REF` uz tukšā Supabase projekta ref un
    `PLATFORM_RESTORE_DRILL=EMPTY-ISOLATED-TARGET`; izpildi
-   `npm run restore:drill -- backups/lumiq-restore-drill`.
-6. Veiksmes izvadē jābūt sakrītošam publisko tabulu/rindu inventāram un visu R2
+   `npm run restore:drill -- <sekmīgi-verificētās-backup-mapes-cels>`.
+7. Veiksmes izvadē jābūt sakrītošam publisko tabulu/rindu inventāram un visu R2
    atslēgu, izmēru, SHA-256 kontrolsummu sakritībai. Pēc tam manuāli izpildi
    migration verifieri, ielādē atjaunoto aplikāciju izolētā kandidātā, pārbaudi
    `/healthz`, login, galeriju un izvelc vismaz vienu atjaunoto ZIP.
-7. Fiksē avota/mērķa ID (bez noslēpumiem), koda versiju, objektu/rindu skaitu,
+8. Fiksē avota/mērķa ID (bez noslēpumiem), koda versiju, objektu/rindu skaitu,
    ZIP manifestu, ilgumu, neatbilstības un veicēju. Tikai tad atzīmē restore
    gate kā izpildītu. Pēc testa iznīcini tikai īpaši šim drill izveidotos
    atjaunošanas resursus.
