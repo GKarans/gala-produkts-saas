@@ -6,7 +6,7 @@ The backup contains the Lumiq public application tables, Supabase Auth user/iden
 
 ## Backup
 
-1. Install PostgreSQL client tools matching the server major version (the local helper also checks `%LOCALAPPDATA%\Lumiq\postgresql17\bin` and `%USERPROFILE%\AppData\Local\Lumiq\postgresql17\bin`).
+1. Install PostgreSQL 17 **Command Line Tools** only; a local PostgreSQL server is not required. The [official PostgreSQL Windows download page](https://www.postgresql.org/download/windows/) links to the EDB installer, where Command Line Tools can be selected as a component. The helper checks `%LOCALAPPDATA%\Lumiq\postgresql17\bin`, `%USERPROFILE%\AppData\Local\Lumiq\postgresql17\bin`, `%ProgramFiles%\PostgreSQL\17\bin`, and the current `PATH`, then confirms both clients are major version 17.
 2. Run `platform/scripts/backup-local.ps1`. It prompts for credentials locally, validates the source project and bucket, then verifies the archive.
 3. Keep the verified backup directory outside the repository, encrypt it at rest, and record duration, dump size, object count and manifest checksum.
 5. Encrypt the directory at rest and record duration, dump size, object count and manifest checksum.

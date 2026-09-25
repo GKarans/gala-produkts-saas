@@ -8,6 +8,14 @@ if ($env:LOCALAPPDATA) {
 if ($env:USERPROFILE) {
   $toolCandidates += Join-Path $env:USERPROFILE 'AppData\Local\Lumiq\postgresql17\bin'
 }
+if ($env:ProgramFiles) {
+  $toolCandidates += Join-Path $env:ProgramFiles 'PostgreSQL\17\bin'
+}
+$pathDump = Get-Command pg_dump.exe -ErrorAction SilentlyContinue
+$pathRestore = Get-Command pg_restore.exe -ErrorAction SilentlyContinue
+if ($pathDump -and $pathRestore -and (Split-Path -Parent $pathDump.Source) -eq (Split-Path -Parent $pathRestore.Source)) {
+  $toolCandidates += Split-Path -Parent $pathDump.Source
+}
 $toolPath = $null
 foreach ($candidate in $toolCandidates) {
   if ((Test-Path -LiteralPath (Join-Path $candidate 'pg_dump.exe')) -and
@@ -48,7 +56,12 @@ function Set-MaskedProcessValue {
 
 if (-not $toolPath) {
   $checked = if ($toolCandidates.Count) { $toolCandidates -join '; ' } else { 'LOCALAPPDATA and USERPROFILE are unset' }
-  throw "PostgreSQL client tools were not found. Checked: $checked. Expected pg_dump.exe and pg_restore.exe."
+  throw "PostgreSQL 17 client tools were not found. Install only the PostgreSQL 17 Command Line Tools, then rerun. Checked: $checked."
+}
+$dumpVersion = (& (Join-Path $toolPath 'pg_dump.exe') --version | Out-String).Trim()
+$restoreVersion = (& (Join-Path $toolPath 'pg_restore.exe') --version | Out-String).Trim()
+if ($dumpVersion -notmatch '^pg_dump \(PostgreSQL\) 17\.' -or $restoreVersion -notmatch '^pg_restore \(PostgreSQL\) 17\.') {
+  throw "PostgreSQL 17 client tools are required. Found: '$dumpVersion'; '$restoreVersion'."
 }
 if (Test-Path -LiteralPath $backupPath) {
   throw 'The generated backup path already exists; do not overwrite a previous drill.'
