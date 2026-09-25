@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {validateWebp} from '../../cloudflare/worker/src/webp-validation.js';
 import {createQueueConsumer,createWorkerHandler} from '../../cloudflare/worker/src/router.js';
-import worker,{assertMigrationsApplied,migrationVersions} from '../../cloudflare/worker/src/index.js';
+import worker,{assertMigrationsApplied,createScheduledHandler,migrationVersions} from '../../cloudflare/worker/src/index.js';
 
 test('Worker startup requires every current platform migration',()=>{
  const applied=new Set(migrationVersions);
@@ -88,6 +88,22 @@ test('Worker release gate also blocks scheduled database and mail work',async()=
   await worker.scheduled({}, {...env,HYPERDRIVE:{connectionString:'unused-test-connection'}}, context);
  }
  assert.equal(scheduled,0);
+});
+
+test('scheduled Worker processes one database-polled job per invocation',async()=>{
+ const calls=[],closed=[],runScheduled=createScheduledHandler(async()=>({
+  jobs:{retention:async()=>calls.push('retention'),tick:async options=>calls.push(options)},
+  deliverMail:async()=>calls.push('mail'),
+  db:{close:async()=>closed.push(true)}
+ }));
+ let scheduled;
+ await runScheduled({},
+  {PLATFORM_MODE:'staging',PLATFORM_RELEASE_APPROVED:'staging',HYPERDRIVE:{connectionString:'unused-test-connection'}},
+  {waitUntil:promise=>{scheduled=promise;}}
+ );
+ await scheduled;
+ assert.deepEqual(calls,['retention',{concurrency:1,maxJobs:1},'mail']);
+ assert.equal(closed.length,1);
 });
 
 test('queue consumer runs only valid targeted jobs, closes DB and retries startup failures',async()=>{

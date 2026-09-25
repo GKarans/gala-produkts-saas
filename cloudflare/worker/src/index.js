@@ -68,10 +68,8 @@ async function getApp(env) {
 
 const handler = createWorkerHandler(getApp);
 const consumeJobs = createQueueConsumer(getApp);
-
-export default {
-  ...handler,
-  async scheduled(_controller, env, context) {
+export function createScheduledHandler(getApp) {
+  return async (_controller, env, context) => {
     if (!isReleaseApproved(env.PLATFORM_MODE, env.PLATFORM_RELEASE_APPROVED)) return;
     if (!env.HYPERDRIVE?.connectionString) return;
     context.waitUntil((async () => {
@@ -79,13 +77,19 @@ export default {
       try {
         await app.jobs.retention();
         if (env.LUMIQ_JOBS_QUEUE) await app.jobs.dispatch(env.LUMIQ_JOBS_QUEUE);
-        else await app.jobs.tick({concurrency: 3, maxJobs: 10});
+        else await app.jobs.tick({concurrency: 1, maxJobs: 1});
         await app.deliverMail();
       } finally {
         await app.db.close();
       }
     })());
-  },
+  };
+}
+const scheduled = createScheduledHandler(getApp);
+
+export default {
+  ...handler,
+  scheduled,
   async queue(batch, env) {
     await consumeJobs(batch, env);
   }
