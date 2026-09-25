@@ -1,5 +1,6 @@
 import {loadSharp} from './image-runtime.mjs';
 import {uuid,requireThat,Fault} from './security.mjs';
+import {eventFolder} from '../shared/storage-keys.js';
 
 export async function replaceCover(db,files,events,user,eventId,data,validateImage){
  requireThat(typeof data==='string'&&data.length<9*1024**2,413,'Choose a smaller cover.');
@@ -7,11 +8,12 @@ export async function replaceCover(db,files,events,user,eventId,data,validateIma
  let photo;
  try{const source=Buffer.from(data,'base64');if(validateImage){await validateImage(source);photo=source;}else{const sharp=await loadSharp();photo=await sharp(source,{limitInputPixels:40e6}).rotate().resize({width:1600,withoutEnlargement:true}).webp({quality:82}).toBuffer();}}
  catch{throw new Fault(415,'This cover could not be opened.');}
- const key=`${initial.storage_prefix}/covers/${uuid()}.webp`,cleanupId=uuid();
+ const organizerPrefix=await events.organizerPrefix(user),key=`${organizerPrefix}/cover/${eventFolder(initial.name,eventId)}-guest-cover-${uuid()}.webp`,cleanupId=uuid();
  // Reserve cleanup before writing. A crash or failed attachment leaves a recoverable job.
  await db.query("insert into jobs(id,owner_id,event_id,type,payload,available_at) values($1,$2,$3,'object-cleanup',$4,now()+interval '10 minutes')",[cleanupId,user.id,eventId,{keys:[key]}]);
  await files.put(key,photo);
  await db.transaction(async tx=>{
+  await tx.query('select id from accounts where id=$1 for update',[user.id]);
   const e=await events.own(user,eventId,tx);
   requireThat(['draft','published'].includes(e.status)&&Date.parse(e.retention_at)>Date.now(),409,'This event can no longer be redesigned.');
   const reservation=(await tx.query('select status from jobs where id=$1 for update',[cleanupId])).rows[0];

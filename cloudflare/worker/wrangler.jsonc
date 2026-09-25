@@ -17,7 +17,8 @@
   "vars": {
     "PLATFORM_MODE": "staging",
     "PLATFORM_RELEASE_APPROVED": "staging",
-    "PLATFORM_ORIGIN": "https://lumiq.cam"
+    "PLATFORM_ORIGIN": "https://lumiq.cam",
+    "PLATFORM_SUPABASE_PROJECT_REF": "mkycfegxlzidaezljutq"
   },
   "triggers": {
     "crons": ["* * * * *"]

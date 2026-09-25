@@ -1,0 +1,134 @@
+import {execFileSync} from "node:child_process";
+import {readFile} from "node:fs/promises";
+import path from "node:path";
+import {fileURLToPath} from "node:url";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+
+function requireThat(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+function oneBinding(items, name, field) {
+  const matches = (Array.isArray(items) ? items : []).filter(item => item?.binding === name);
+  requireThat(matches.length === 1, `Expected exactly one ${name} ${field} binding.`);
+  return matches[0];
+}
+
+export function validateProductionConfig(candidate, staging, closedTestHyperdriveId) {
+  requireThat(candidate && typeof candidate === "object", "Production config must be an object.");
+  requireThat(typeof closedTestHyperdriveId === "string" && /^[a-f0-9]{32}$/i.test(closedTestHyperdriveId), "Supply the current closed-test Hyperdrive ID.");
+  requireThat(typeof candidate.name === "string" && candidate.name.length > 0, "Production worker name is required.");
+  requireThat(![staging.name, "lumiq-closed-test"].includes(candidate.name), "Production candidate must use a separate Worker name.");
+  requireThat(candidate.workers_dev === true && candidate.preview_urls === false, "Candidate must use workers.dev with preview URLs disabled.");
+  requireThat(!candidate.env || Object.keys(candidate.env).length === 0, "Named Wrangler environments require a separate reviewed preflight.");
+  requireThat(!candidate.routes?.length, "Candidate must not claim custom domains or routes.");
+  for (const bindingGroup of ["services", "d1_databases", "kv_namespaces", "durable_objects", "workflows", "dispatch_namespaces", "vectorize", "r2_data_catalogs"]) {
+    requireThat(!candidate[bindingGroup]?.length, `Unexpected ${bindingGroup} binding requires separate review.`);
+  }
+
+  const vars = candidate.vars || {};
+  requireThat(vars.PLATFORM_MODE === "production" && vars.PLATFORM_RELEASE_APPROVED === "production", "Production mode and approval must both be explicit.");
+  let origin;
+  try { origin = new URL(vars.PLATFORM_ORIGIN); } catch { throw new Error("Production candidate origin is invalid."); }
+  requireThat(origin.protocol === "https:" && origin.hostname.startsWith(`${candidate.name}.`) && origin.hostname.endsWith(".workers.dev") && origin.origin === vars.PLATFORM_ORIGIN, "Candidate origin must be its own bare HTTPS workers.dev origin.");
+  requireThat(typeof vars.PLATFORM_SUPABASE_URL === "string" && /^https:\/\/[a-z0-9]+\.supabase\.co$/i.test(vars.PLATFORM_SUPABASE_URL), "Production Supabase project URL is required.");
+  const authProjectRef = new URL(vars.PLATFORM_SUPABASE_URL).hostname.split(".")[0].toLowerCase();
+  requireThat(typeof vars.PLATFORM_SUPABASE_PROJECT_REF === "string" && /^[a-z0-9]+$/i.test(vars.PLATFORM_SUPABASE_PROJECT_REF) && vars.PLATFORM_SUPABASE_PROJECT_REF.toLowerCase() === authProjectRef, "Production Auth URL and verified database project reference must match.");
+  requireThat(typeof vars.PLATFORM_SUPABASE_PUBLISHABLE_KEY === "string" && vars.PLATFORM_SUPABASE_PUBLISHABLE_KEY.length > 0, "Supabase publishable key is required.");
+  requireThat(!Object.keys(vars).some(key => /(?:SECRET|TOKEN|PASSWORD|DATABASE_URL|ACCESS_KEY|SERVICE_ROLE|PRIVATE_KEY|SESSION_ENCRYPTION_KEY|EMAIL_KEY)/i.test(key)), "Secrets must be configured with secret bindings, not vars.");
+
+  const stageDb = oneBinding(staging.hyperdrive, "HYPERDRIVE", "Hyperdrive");
+  const prodDb = oneBinding(candidate.hyperdrive, "HYPERDRIVE", "Hyperdrive");
+  requireThat(candidate.hyperdrive.length === 1, "Production config must not include additional Hyperdrive bindings.");
+  requireThat(/^[a-f0-9]{32}$/i.test(prodDb.id || ""), "Production Hyperdrive ID is invalid.");
+  requireThat(prodDb.id.toLowerCase() !== stageDb.id.toLowerCase() && prodDb.id.toLowerCase() !== closedTestHyperdriveId.toLowerCase(), "Production must not reuse staging or closed-test Hyperdrive.");
+
+  const stageR2 = oneBinding(staging.r2_buckets, "R2_PHOTOS", "R2");
+  const prodR2 = oneBinding(candidate.r2_buckets, "R2_PHOTOS", "R2");
+  requireThat(candidate.r2_buckets.length === 1, "Production config must not include additional R2 buckets.");
+  requireThat(typeof prodR2.bucket_name === "string" && /^lumiq-production-[a-z0-9-]+$/.test(prodR2.bucket_name), "Production R2 bucket must use the lumiq-production-* namespace.");
+  requireThat(prodR2.bucket_name !== stageR2.bucket_name && prodR2.bucket_name !== "lumiq-closed-test-photos" && prodR2.bucket_name !== "app-images", "Production must not reuse a staging, test or legacy bucket.");
+
+  requireThat(vars.R2_BUDGET_ENABLED === "true", "Production requires the R2 usage hard stop.");
+  for (const key of ["R2_MAX_CLASS_A_OPS_MONTH", "R2_MAX_CLASS_B_OPS_MONTH", "R2_MAX_LIFETIME_WRITE_BYTES", "R2_MAX_STREAM_WRITE_BYTES"]) {
+    requireThat(Number.isSafeInteger(Number(vars[key])) && Number(vars[key]) > 0, `Production requires a positive ${key} limit.`);
+  }
+
+  const producer = (candidate.queues?.producers || []).filter(item => item?.binding === "LUMIQ_JOBS_QUEUE");
+  requireThat(producer.length === 1 && candidate.queues.producers.length === 1 && /^lumiq-production-[a-z0-9-]+$/.test(producer[0].queue || ""), "Production jobs Queue binding is missing or not isolated.");
+  const consumers = (candidate.queues?.consumers || []).filter(item => item?.queue === producer[0].queue);
+  requireThat(consumers.length === 1 && candidate.queues.consumers.length === 1 && /^lumiq-production-[a-z0-9-]+$/.test(consumers[0].dead_letter_queue || ""), "Production jobs consumer must have a separate production DLQ.");
+  requireThat(consumers[0].dead_letter_queue !== producer[0].queue && vars.LUMIQ_JOBS_DLQ_NAME === consumers[0].dead_letter_queue, "Production DLQ name must match the Worker configuration.");
+
+  return {worker: candidate.name, origin: origin.origin, hyperdriveId: prodDb.id, bucket: prodR2.bucket_name, queue: producer[0].queue, dlq: consumers[0].dead_letter_queue};
+}
+
+export function validateRemoteHyperdriveProject(config, expectedId, expectedProjectRef) {
+  requireThat(config && config.id === expectedId, "Remote Hyperdrive ID does not match the candidate binding.");
+  const host = config.origin?.host?.toLowerCase();
+  const username = config.origin?.user?.toLowerCase();
+  requireThat(typeof host === "string" && typeof username === "string", "Remote Hyperdrive origin metadata is incomplete.");
+
+  let projectRef;
+  if (host.endsWith(".pooler.supabase.com")) {
+    projectRef = username.split(".").at(-1);
+  } else {
+    projectRef = /^db\.([a-z0-9]+)\.supabase\.co$/i.exec(host)?.[1]?.toLowerCase();
+  }
+  requireThat(projectRef === expectedProjectRef.toLowerCase(), "Remote Hyperdrive origin does not match the candidate Supabase project reference.");
+  return {id: config.id, host, projectRef};
+}
+
+function getRemoteHyperdriveConfig(id) {
+  const wrangler = path.join(root, "node_modules/wrangler/bin/wrangler.js");
+  let output;
+  try {
+    output = execFileSync(process.execPath, [wrangler, "hyperdrive", "get", id], {
+      cwd: root,
+      encoding: "utf8",
+      timeout: 30000,
+      maxBuffer: 1024 * 1024
+    });
+  } catch {
+    throw new Error("Unable to read the candidate Hyperdrive from Cloudflare; authenticate Wrangler and retry.");
+  }
+  const start = output.indexOf("{");
+  const end = output.lastIndexOf("}");
+  requireThat(start >= 0 && end > start, "Cloudflare returned no parseable Hyperdrive configuration.");
+  try { return JSON.parse(output.slice(start, end + 1)); }
+  catch { throw new Error("Cloudflare returned an invalid Hyperdrive configuration."); }
+}
+
+async function readConfig(file) {
+  let parsed;
+  try { parsed = JSON.parse(await readFile(file, "utf8")); }
+  catch { throw new Error(`Cannot parse ${file}; use valid JSON syntax in the Wrangler config.`); }
+  return parsed;
+}
+
+async function main() {
+  const [candidatePath, ...args] = process.argv.slice(2);
+  const testIdArg = args.find(value => value.startsWith("--closed-test-hyperdrive-id="));
+  requireThat(candidatePath && testIdArg, "Usage: npm run production:preflight -- <production-wrangler-config.jsonc> --closed-test-hyperdrive-id=<id>");
+  const candidateFile = path.resolve(candidatePath);
+  const [candidate, staging] = await Promise.all([
+    readConfig(candidateFile),
+    readConfig(path.join(root, "cloudflare/worker/wrangler.jsonc"))
+  ]);
+  const result = validateProductionConfig(candidate, staging, testIdArg.split("=", 2)[1]);
+  const remoteDatabase = validateRemoteHyperdriveProject(
+    getRemoteHyperdriveConfig(result.hyperdriveId),
+    result.hyperdriveId,
+    candidate.vars.PLATFORM_SUPABASE_PROJECT_REF
+  );
+  console.log(`Production candidate passed static isolation and remote DB identity checks: worker=${result.worker}, origin=${result.origin}, Hyperdrive=${remoteDatabase.id}, DB project=${remoteDatabase.projectRef}, R2=${result.bucket}, Queue=${result.queue}, DLQ=${result.dlq}.`);
+  console.log("No deployment or resource changes were performed. Verify Cloudflare Access, R2/Queue existence and Wrangler dry-run bindings separately.");
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch(error => {
+    console.error(`Production preflight failed: ${error.message}`);
+    process.exitCode = 1;
+  });
+}

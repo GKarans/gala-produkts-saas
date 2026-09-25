@@ -2,6 +2,7 @@ import {uuid,text,requireThat,hash} from './security.mjs';
 import {loadSharp} from './image-runtime.mjs';
 import {DateTime} from 'luxon';
 import {eventState} from '../shared/plans.js';
+import {photographerFolder,photoObjectName} from '../shared/storage-keys.js';
 
 const encodeCursor=row=>Buffer.from(JSON.stringify([new Date(row.created_at).toISOString(),row.id])).toString('base64url');
 function decodeCursor(value){
@@ -20,14 +21,24 @@ export function mediaService(db,files,events,validateImage=async bytes=>{const s
    const id=text(input.id,36);requireThat(/^[0-9a-f-]{36}$/i.test(id),400,'Invalid photo identifier.');
    const bytes=Number(input.bytes),thumb=Number(input.thumbnail_bytes);requireThat(bytes>0&&bytes<=6291456&&thumb>0&&thumb<=1048576,413,'The optimized photo must be under 6 MB.');
    return db.transaction(async tx=>{
+    await events.organizerPrefix({id:e.owner_id},tx);
     e=(await tx.query('select * from events where id=$1 for update',[e.id])).rows[0];requireThat(eventState(e)==='live',409,'This event is closed for uploads.');
     const previous=(await tx.query('select * from media where id=$1',[id])).rows[0];
     if(previous){requireThat(previous.event_id===e.id&&previous.guest_id===g.id&&previous.bytes===bytes&&previous.thumbnail_bytes===thumb&&previous.checksum===input.checksum&&previous.thumbnail_checksum===input.thumbnail_checksum&&previous.status!=='deleted',409,'This upload cannot be replaced.');return previous;}
     const used=(await tx.query("select count(*)::int as photos,coalesce(sum(bytes+thumbnail_bytes),0)::bigint as bytes from media where event_id=$1 and status in ('pending','uploaded')",[e.id])).rows[0];
     requireThat(used.photos<e.entitlement.photos&&Number(used.bytes)+bytes+thumb<=e.entitlement.bytes,409,'This event has reached its photo or storage allowance.');
     for(const h of [input.checksum,input.thumbnail_checksum])requireThat(/^[a-f0-9]{64}$/.test(h),400,'Photo validation failed.');
-    const key=`${g.storage_prefix}/photo-${id}.webp`,thumbnail=`${g.storage_prefix}/thumb-${id}.webp`;
-    return(await tx.query('insert into media(id,event_id,guest_id,object_key,thumbnail_key,name,bytes,thumbnail_bytes,checksum,thumbnail_checksum) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *',[id,e.id,g.id,key,thumbnail,text(input.name,180),bytes,thumb,input.checksum,input.thumbnail_checksum])).rows[0];
+    const requestedCapture=Number(input.captured_at),now=Date.now(),capturedAt=Number.isFinite(requestedCapture)&&requestedCapture>=Date.UTC(1980,0,1)&&requestedCapture<=now+86400000?new Date(requestedCapture):new Date(now);
+    const eventPrefix=await events.organizedEventPrefix(e,tx),guestPrefix=`${eventPrefix}/${photographerFolder(g.name,g.id)}`;let filename,key,thumbnail;
+    for(const offset of [26,0,6,12,18,24]){
+     filename=photoObjectName(g.name,capturedAt,id.replaceAll('-','').slice(offset,offset+6));
+     key=`${guestPrefix}/${filename}`;thumbnail=`${guestPrefix}/thumb/${filename}`;
+     const collision=(await tx.query('select 1 from media where object_key in ($1,$2) or thumbnail_key in ($1,$2) limit 1',[key,thumbnail])).rows.length;
+     if(!collision)break;
+     filename=key=thumbnail=null;
+    }
+    requireThat(filename,409,'Could not allocate a unique photo filename. Please try again.');
+    return(await tx.query('insert into media(id,event_id,guest_id,object_key,thumbnail_key,name,bytes,thumbnail_bytes,checksum,thumbnail_checksum,captured_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning *',[id,e.id,g.id,key,thumbnail,text(input.name,180),bytes,thumb,input.checksum,input.thumbnail_checksum,capturedAt.toISOString()])).rows[0];
    });
   },
   async upload(e,g,id,kind,bytes){const m=await ready(id);requireThat(m.event_id===e.id&&m.guest_id===g.id&&m.status==='pending'&&eventState(e)==='live',409,'This upload is no longer available.');const thumb=kind==='thumb';requireThat(['thumb','photo'].includes(kind),400,'Invalid photo variant.');requireThat(bytes.length===Number(thumb?m.thumbnail_bytes:m.bytes)&&hash(bytes)===(thumb?m.thumbnail_checksum:m.checksum),400,'The photo changed during upload. Try again.');requireThat(bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WEBP',415,'Upload a supported photo.');await files.put(thumb?m.thumbnail_key:m.object_key,bytes);return{ok:true};},
@@ -56,6 +67,6 @@ export function mediaService(db,files,events,validateImage=async bytes=>{const s
     await tx.query('insert into audit(id,actor_id,action,target_id,detail) values($1,$2,$3,$4,$5)',[uuid(),user.id,`gallery.${input.action}`,e.id,{ids}]);return{ok:true};
    });
   },
-  async remove(user,e,ids){requireThat(Array.isArray(ids)&&ids.length>0&&ids.length<=200,400,'Select 1 to 200 photos.');await db.transaction(async tx=>{const rows=(await tx.query("select id from media where event_id=$1 and id=any($2::uuid[]) and status='uploaded'",[e.id,ids])).rows;requireThat(rows.length===new Set(ids).size,404,'Some selected photos are unavailable.');await tx.query("update media set status='deleted',deleted_at=now() where event_id=$1 and id=any($2::uuid[])",[e.id,ids]);await tx.query('update events set gallery_cover_id=null where id=$1 and gallery_cover_id=any($2::uuid[])',[e.id,ids]);await tx.query("insert into jobs(id,owner_id,event_id,type,payload) values($1,$2,$3,'media-cleanup',$4)",[uuid(),user.id,e.id,{ids}]);});return{ok:true};}
+  async remove(user,e,ids){requireThat(Array.isArray(ids)&&ids.length>0&&ids.length<=200,400,'Select 1 to 200 photos.');await db.transaction(async tx=>{await tx.query('select id from events where id=$1 for update',[e.id]);const rows=(await tx.query("select id from media where event_id=$1 and id=any($2::uuid[]) and status='uploaded'",[e.id,ids])).rows;requireThat(rows.length===new Set(ids).size,404,'Some selected photos are unavailable.');await tx.query("update media set status='deleted',deleted_at=now() where event_id=$1 and id=any($2::uuid[])",[e.id,ids]);await tx.query('update events set gallery_cover_id=null where id=$1 and gallery_cover_id=any($2::uuid[])',[e.id,ids]);await tx.query("insert into jobs(id,owner_id,event_id,type,payload) values($1,$2,$3,'media-cleanup',$4)",[uuid(),user.id,e.id,{ids}]);});return{ok:true};}
  };
 }

@@ -13,7 +13,7 @@ test('publication allowance and Single Event purchases',async t=>{
  const publish=(u,e,funding='plan')=>app.events.action(u,e.id,{action:'publish',funding});
  try{
   await t.test('new plan limits and automatic expiry archive behavior',async()=>{
-   assert.deepEqual(['trial','single','gathering','studio'].map(id=>{const p=PLANS[id];return[p.price,p.photos,p.bytes/1024**2,p.durationDays,p.retentionDays,p.shareDays];}),[[0,50,300,1,7,4],[1500,500,2000,3,14,7],[3000,500,2000,3,14,7],[7000,1000,4000,3,30,14]]);
+   assert.deepEqual(['trial','single','gathering','studio'].map(id=>{const p=PLANS[id];return[p.price,p.photos,p.bytes/1024**2,p.durationDays,p.retentionDays,p.shareDays];}),[[0,50,30,1,7,4],[1500,500,200,3,14,7],[3000,500,200,3,14,7],[7000,1000,400,3,30,14]]);
    const u=await account('gathering'),e=await draft(u);await publish(u,e);
    await db.query("update events set starts_at=now()-interval '2 hours',ends_at=now()-interval '1 hour',retention_at=now()-interval '1 second',share_enabled=true where id=$1",[e.id]);
    const expired=await app.events.own(u,e.id);assert.equal(eventState(expired),'archived');
@@ -23,6 +23,34 @@ test('publication allowance and Single Event purchases',async t=>{
    await app.jobs.retention();await app.jobs.tick();
    assert.equal((await app.events.own(u,e.id)).status,'archived');
    assert.equal((await db.query("select count(*)::int as n from jobs where event_id=$1 and type='retention-cleanup' and status='ready'",[e.id])).rows[0].n,1);
+  });
+  await t.test('event completion archives its gallery snapshot; later gallery deletion does not change the ZIP',async()=>{
+   const u=await account('studio'),e=await draft(u);await publish(u,e);
+   const guestId=uuid();await db.query('insert into guests(id,event_id,name,token_hash,storage_prefix) values($1,$2,$3,$4,$5)',[guestId,e.id,'Guest','token-'+guestId,'guest/test']);
+   const photo=Buffer.from('synthetic-webp-fixture');
+   const ids=[uuid(),uuid()],deletedBeforeEnd=uuid();
+   for(let i=0;i<ids.length;i++){const key=`automatic/${ids[i]}.webp`;await app.files.put(key,photo);await db.query("insert into media(id,event_id,guest_id,object_key,thumbnail_key,name,bytes,thumbnail_bytes,status) values($1,$2,$3,$4,$5,$6,$7,1,'uploaded')",[ids[i],e.id,guestId,key,`automatic/${ids[i]}-thumb.webp`,`${i}.webp`,photo.length]);}
+   await db.query("insert into media(id,event_id,guest_id,object_key,thumbnail_key,name,bytes,thumbnail_bytes,status,deleted_at) values($1,$2,$3,$4,$5,'removed.webp',$6,1,'deleted',now()-interval '2 hours')",[deletedBeforeEnd,e.id,guestId,`automatic/${deletedBeforeEnd}.webp`,`automatic/${deletedBeforeEnd}-thumb.webp`,photo.length]);
+   await db.query("update events set name='Synthetic party',description='Remove at retention expiry',appearance='{\"cover\":\"private-cover\"}',starts_at=now()-interval '2 hours',ends_at=now()-interval '1 hour',retention_at=now()+interval '30 days' where id=$1",[e.id]);
+   await app.jobs.retention();
+   let autos=(await db.query("select * from jobs where event_id=$1 and type='export' and payload->>'automatic'='true'",[e.id])).rows;
+   assert.equal(autos.length,1);assert.equal(autos[0].status,'queued');assert.deepEqual([...autos[0].payload.ids].sort(),[...ids].sort());
+   await app.jobs.retention();assert.equal((await db.query("select count(*)::int as n from jobs where event_id=$1 and type='export' and payload->>'automatic'='true'",[e.id])).rows[0].n,1);
+   await app.media.remove(u,await app.events.own(u,e.id),[ids[0]]);
+   await db.query("update jobs set status='failed' where id=$1",[autos[0].id]);await db.query("update jobs set available_at=now() where type='media-cleanup' and event_id=$1",[e.id]);await app.jobs.tick();
+   assert.equal(await app.files.size(`automatic/${ids[0]}.webp`),photo.length,'Keep the event-end snapshot source available while a failed automatic export can be retried.');
+   await db.query("update jobs set status='queued',available_at=now() where id=$1",[autos[0].id]);await app.jobs.tick();autos=(await db.query("select * from jobs where event_id=$1 and type='export' and payload->>'automatic'='true'",[e.id])).rows;assert.equal(autos[0].status,'ready');assert.equal(autos[0].result.count,2);assert.equal(autos[0].result.expires_at,new Date((await app.events.own(u,e.id)).retention_at).toISOString());
+   await app.media.remove(u,await app.events.own(u,e.id),[ids[1]]);await app.jobs.retention();
+   assert.equal((await db.query('select status from jobs where id=$1',[autos[0].id])).rows[0].status,'ready');
+   await app.jobs.retention();assert.equal((await db.query("select count(*)::int as n from jobs where event_id=$1 and type='export' and payload->>'automatic'='true'",[e.id])).rows[0].n,1,'The maintenance cycle must not rebuild or replace the immutable archive.');
+   const archivedZip=autos[0].result.parts[0].key;assert(await app.files.size(archivedZip));
+   await db.query("update jobs set available_at=now() where type='media-cleanup' and event_id=$1",[e.id]);await app.jobs.tick();assert(await app.files.size(archivedZip),'Deleting gallery photos must not remove them from the already generated ZIP.');
+   await db.query("update events set retention_at=now()-interval '1 second' where id=$1",[e.id]);await app.jobs.retention();await app.jobs.tick();
+   assert.equal((await db.query('select count(*)::int as n from media where event_id=$1',[e.id])).rows[0].n,0);
+   assert.equal((await db.query('select count(*)::int as n from guests where event_id=$1',[e.id])).rows[0].n,0);
+   await assert.rejects(app.files.size(archivedZip),{code:'ENOENT'},'Retention expiry removes the ZIP as well as gallery media.');
+   const archived=(await db.query('select name,description,appearance,status,starts_at,ends_at,retention_at from events where id=$1',[e.id])).rows[0];
+   assert.equal(archived.name,'Synthetic party');assert.equal(archived.description,'');assert.deepEqual(archived.appearance,{});assert.equal(archived.status,'archived');assert(archived.starts_at&&archived.ends_at&&archived.retention_at);
   });
   await t.test('expired subscriptions preserve owner access and post-event sharing until retention ends',async()=>{
    for(const plan of ['gathering','studio']){

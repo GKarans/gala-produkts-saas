@@ -9,7 +9,7 @@ function memoryBucket(){
  return {
   objects,
   async put(key,value,options={}){const bytes=value instanceof ReadableStream?new Uint8Array(await new Response(value).arrayBuffer()):new Uint8Array(value);objects.set(key,{bytes,contentType:options.httpMetadata?.contentType});return{key,size:bytes.byteLength};},
-  async get(key){const object=objects.get(key);return object?{size:object.bytes.byteLength,httpMetadata:{contentType:object.contentType},arrayBuffer:async()=>object.bytes.slice().buffer}:null;},
+  async get(key){const object=objects.get(key);return object?{size:object.bytes.byteLength,httpMetadata:{contentType:object.contentType},arrayBuffer:async()=>object.bytes.slice().buffer,body:new Blob([object.bytes]).stream()}:null;},
   async head(key){const object=objects.get(key);return object?{size:object.bytes.byteLength}:null;},
   async delete(key){objects.delete(key);}
  };
@@ -20,6 +20,7 @@ test('Worker R2 adapter stores, reads, sizes, and deletes private objects',async
  assert.equal(files.remote,true);
  await files.put('event--id/guests/guest--id/photo.webp',bytes,'image/webp');
  assert.deepEqual(await files.get('event--id/guests/guest--id/photo.webp'),bytes);
+ assert.equal(await new Response(await files.getStream('event--id/guests/guest--id/photo.webp')).text(),'photo bytes');
  assert.equal(await files.size('event--id/guests/guest--id/photo.webp'),bytes.length);
  assert.equal(bucket.objects.get('event--id/guests/guest--id/photo.webp').contentType,'image/webp');
  await files.remove('event--id/guests/guest--id/photo.webp');
@@ -67,9 +68,10 @@ test('Worker R2 stream writes require and enforce a bounded byte reservation',as
  const db=await openDatabase({memory:true}),bucket=memoryBucket();
  try{
   const files=createR2Storage(bucket,{db,limits:{classAOpsPerMonth:5,classBOpsPerMonth:5,lifetimeWriteBytes:10,streamWriteBytes:5}});
-  await files.putStream('events/export.zip',new Blob(['four']).stream(),'application/zip',{maxBytes:5});
-  assert.equal((await db.query('select lifetime_write_bytes from r2_usage_guard where singleton=true')).rows[0].lifetime_write_bytes,5);
-  await assert.rejects(files.putStream('events/too-large.zip',new Blob(['six!!!']).stream(),'application/zip',{maxBytes:5}),/configured storage safety limit/);
+  await files.putStream('events/export.zip',new Blob(['four']).stream(),'application/zip',{maxBytes:5,contentLength:4});
+  assert.equal((await db.query('select lifetime_write_bytes from r2_usage_guard where singleton=true')).rows[0].lifetime_write_bytes,4);
+  await assert.rejects(files.putStream('events/too-large.zip',new Blob(['six!!!']).stream(),'application/zip',{maxBytes:5,contentLength:6}),/configured storage safety limit/);
+  await assert.rejects(files.putStream('events/wrong-length.zip',new Blob(['four']).stream(),'application/zip',{maxBytes:5,contentLength:3}),/declared length/);
   await assert.rejects(files.putStream('events/unreserved.zip',new Blob(['x']).stream(),'application/zip'),/configured storage safety limit/);
  } finally {
   await db.close();

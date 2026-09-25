@@ -8,14 +8,14 @@ Atjaunināts 2026. gada 22. septembrī. Šis ir darba dokuments, nevis juridisks
 | --- | --- |
 | Produkta nosaukums | Lumiq ir pagaidu darba nosaukums; vēlāk var mainīties. |
 | Juridiskais pakalpojuma sniedzējs | Uzņēmums vai saimnieciskā darbība vēl nav reģistrēta. Nosaukums, reģistrācijas numurs un adrese paliek tukši līdz reģistrācijai. |
-| Domēns | Vēl nav izvēlēts. lumiq.lv nav apstiprināts, tāpēc produkta tekstos tas nav uzdots par faktu. |
+| Domēns | `lumiq.cam` ir pašreizējais domēns, ko īpašnieks izvēlējies nākotnē pārslēgt no staging uz atsevišķu produkcijas vidi. Pārslēgšana vēl nav apstiprināta vai veikta. `lumiq.lv` nav apstiprināts. |
 | Produkts | Pasākumu foto apkopošanas SaaS. Video netiek pieņemts vai glabāts. |
 | Foto apstrāde | Tiek glabāta optimizēta WebP versija un sīktēls, nevis sākotnējais telefona fails. Failu ierobežojumi ir atkarīgi no plāna un tiek pārbaudīti serverī. |
 | Viesu konts | Viesis ievada parādāmo vārdu, bet neveido organizatora kontu. |
 | Foto galerijas piekļuve | Organizators redz sava pasākuma foto. Pēc pasākuma var atsevišķi ieslēgt viesu kopīgošanu. Kopīgošanas saite ir pārsūtāma; tās saņēmēji var apskatīt un saglabāt foto. |
-| Dzēšana un termiņi | Glabāšana sākas pēc pasākuma perioda un foto uzņemšanas beigām. Explore: 7 dienas; Single Event un Gathering: 14 dienas; Studio: 30 dienas. Termiņa beigās foto organizatoram un viesiem vairs nav pieejami; notikums tiek arhivēts, un galerija/faili tiek dzēsti. Arhīvā paliek pasākuma ieraksts un nosaukums. |
+| Dzēšana un termiņi | Glabāšana sākas pēc pasākuma un foto uzņemšanas beigām. Explore: 7 dienas; Single Event un Gathering: 14 dienas; Studio: 30 dienas. Pasākuma beigās automātiski tiek veidots nemainīgs ZIP momentuzņēmums no tajā brīdī galerijā esošajiem foto. Vēlāka foto dzēšana maina kopīgo galeriju, bet ne ZIP. Termiņa beigās galerijas foto un ZIP tiek dzēsti; arhīvā redzams tikai pasākuma nosaukums, datums/laiks un glabāšanas periods. Dzēšanas izpildes laiks vēl jāpārbauda slēgtajā testa vidē. |
 | Viesu galerijas kopīgošana | Maksimums: Explore 4 dienas, Single Event/Gathering 7 dienas, Studio 14 dienas. Organizators var izvēlēties īsāku periodu. Kopīgošana sākas pēc pasākuma un nepārsniedz atlikušo foto glabāšanas termiņu. |
-| Aktuālie foto un glabātuves limiti | Explore: 50 foto, 300 MiB. Single Event: 500 foto, 2000 MiB. Gathering: 500 foto, 2000 MiB. Studio: 1000 foto, 4000 MiB. Foto skaitu un kopējo baitu limitu piemēro vienlaikus; upload tiek apturēts, sasniedzot pirmo no tiem. |
+| Aktuālie foto un glabātuves limiti | Explore: 50 foto, 30 MiB. Single Event: 500 foto, 200 MiB. Gathering: 500 foto, 200 MiB. Studio: 1000 foto, 400 MiB. Foto skaitu un kopējo baitu limitu piemēro vienlaikus; upload tiek apturēts, sasniedzot pirmo no tiem. |
 | Aktuālās cenas | Koda konfigurācijā: Single Event 15 EUR vienreizēji, Gathering 30 EUR mēnesī, Studio 70 EUR mēnesī; Explore ir izmēģinājuma plāns. Tās ir pirms-palaišanas cenas, PVN un gala komerciālie noteikumi nav apstiprināti. |
 | Maksājumi | Pašreizējā lokālā plūsma ir simulācija un neiekasē naudu. Klix un Swedbank ir iespējamie kandidāti; neviens nav izvēlēts, līgums nav noslēgts un integrācija nav aktīva. |
 | Uzņēmuma klienti | Kontā ir personīgā/uzņēmuma profila izvēle un uzņēmuma dati, bet juridiskās personas rekvizīti, PVN ID, rēķina prasības un B2B līguma noteikumi jāapstiprina atbilstoši faktiskajam pārdevējam un tirgiem. |
@@ -58,7 +58,7 @@ Rēķina/attaisnojuma dokumenta automātiska sagatavošana un nosūtīšana vēl
 - Juridiskais pārdevēja nosaukums vai fiziskās personas vārds, uzvārds: ____________________
 - Uzņēmuma/saimnieciskās darbības forma un reģistrācijas numurs: ____________________
 - Juridiskā vai saimnieciskās darbības adrese: ____________________
-- Publiskā vietne un domēns: ____________________
+- Publiskā vietne/domēns: `lumiq.cam` (tehniskais mērķis); publiskas palaišanas un juridiskā pārdevēja informācija vēl jāapstiprina.
 - Klientu atbalsta e-pasts un tālrunis: ____________________
 - Privātuma pieprasījumu kontaktpersona/e-pasts: ____________________
 - PVN reģistrācijas statuss un gala cenas ar nodokļiem: ____________________

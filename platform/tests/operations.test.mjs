@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,rm} from 'node:fs/promises';
+import {mkdtemp,readFile,rm} from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import sharp from 'sharp';
@@ -73,6 +73,9 @@ test('cover replacement preserves the attached file and cleans failed attachment
   await db.query('insert into accounts(id,email,name) values($1,$2,$3)',[user.id,user.email,user.name]);await db.query('insert into subscriptions(account_id) values($1)',[user.id]);
   const start=new Date(Date.now()-2*3600000).toISOString().slice(0,16),end=new Date(Date.now()-3600000).toISOString().slice(0,16);
   const e=await app.events.save(user,{name:'Cover fixture',time_zone:'UTC',start,end});
+  const folder=(await db.query('select storage_prefix from accounts where id=$1',[user.id])).rows[0].storage_prefix;
+  await db.query('update accounts set name=$1 where id=$2',['Renamed Organizer',user.id]);
+  assert.equal(await app.events.organizerPrefix(user),folder);
   await db.query('update events set appearance=$1::jsonb where id=$2',[JSON.stringify([
    JSON.stringify({title:'Cover fixture',cover:'/assets/garden-gathering.webp',font:'roboto'}),
    JSON.stringify({qr_layout:{template:'modern',font:'playfair-display'}})
@@ -81,8 +84,9 @@ test('cover replacement preserves the attached file and cleans failed attachment
   assert.deepEqual(qrLayout,{template:'vintage',font:'roboto',titleSize:76,textX:.5,textY:.15,qrX:.5,qrY:.62,qrScale:1});
   const data=(await sharp({create:{width:16,height:16,channels:3,background:'#16835e'}}).webp().toBuffer()).toString('base64');
   await replaceQrBackground(db,files,app.events,user,e.id,data,validateWebp);const qrBackground=(await app.events.own(user,e.id)).appearance.qr_background_key;
-  assert.match(qrBackground,/\/qr\/.*\.webp$/);
+  assert.match(qrBackground,/^cover-[0-9a-f]{6}\/cover\/cover-fixture-[0-9a-f]{6}-qr-design-.*\.webp$/);
   await replaceCover(db,files,app.events,user,e.id,data,validateWebp);const first=(await app.events.own(user,e.id)).appearance.cover_key;
+  assert.match(first,/^cover-[0-9a-f]{6}\/cover\/cover-fixture-[0-9a-f]{6}-guest-cover-.*\.webp$/);
   const updated=await app.events.save(user,{name:'Cover fixture',title:'Saved design',time_zone:'UTC',start,end},e.id);
   assert.equal(updated.appearance.title,'Saved design');
   assert.equal(updated.appearance.cover,`/api/covers/${e.id}`);
@@ -97,6 +101,45 @@ test('cover replacement preserves the attached file and cleans failed attachment
   const cleanup=(await db.query("select * from jobs where status='queued' and type='object-cleanup'")).rows;
   assert.equal(cleanup.length,1);const detached=cleanup[0].payload.keys[0];assert.ok(await files.size(detached));
   await db.query('update jobs set available_at=now() where id=$1',[cleanup[0].id]);await app.jobs.tick();await assert.rejects(files.get(detached));assert.ok(await files.size(second));
+ }finally{await db.close();await rm(root,{recursive:true,force:true});}
+});
+
+test('every new event starts with its own cover and QR design',async()=>{
+ const db=await openDatabase({memory:true}),root=await mkdtemp(path.join(os.tmpdir(),'gf-design-defaults-'));
+ const files=storage({root}),app=await createApp({db,files}),user={id:uuid(),email:'defaults@example.test',name:'Defaults'};
+ try{
+  await db.query('insert into accounts(id,email,name,verified) values($1,$2,$3,true)',[user.id,user.email,user.name]);
+  const start=new Date(Date.now()+3600000).toISOString().slice(0,16),end=new Date(Date.now()+7200000).toISOString().slice(0,16),data=(await sharp({create:{width:16,height:16,channels:3,background:'#16835e'}}).webp().toBuffer()).toString('base64');
+  const first=await app.events.save(user,{name:'First party',start,end,time_zone:'UTC'});
+  await replaceCover(db,files,app.events,user,first.id,data,validateWebp);
+  await saveQrLayout(db,app.events,user,first.id,{template:'vintage',font:'roboto'});
+  await replaceQrBackground(db,files,app.events,user,first.id,data,validateWebp);
+  await saveQrLayout(db,app.events,user,first.id,{template:'custom'});
+  const customized=await app.events.own(user,first.id),coverKey=customized.appearance.cover_key,qrKey=customized.appearance.qr_background_key;
+  await db.query('update accounts set design_defaults=$1::jsonb where id=$2',[{cover:customized.appearance.cover,cover_key:coverKey,qr_layout:customized.appearance.qr_layout,qr_background_key:qrKey},user.id]);
+  const second=await app.events.save(user,{name:'Second party',start,end,time_zone:'UTC'});
+  assert.equal(second.appearance.cover,'/assets/garden-gathering.webp');
+  assert.equal(second.appearance.cover_key,undefined);
+  assert.equal(second.appearance.qr_background_key,undefined);
+  assert.equal(second.appearance.qr_layout,undefined);
+  assert.equal((await app.events.own(user,first.id)).appearance.qr_background_key,qrKey);
+  const outsider={id:uuid(),email:'outsider@example.test',name:'Outsider'},session=uuid();
+  await db.query('insert into accounts(id,email,name,verified) values($1,$2,$3,true)',[outsider.id,outsider.email,outsider.name]);
+  await db.query("insert into sessions(token_hash,account_id,expires_at) values($1,$2,now()+interval '1 hour')",[hash(session),outsider.id]);
+  const outsiderEvent=await app.events.save(outsider,{name:'Other party',start,end,time_zone:'UTC'});
+  assert.notEqual(outsiderEvent.storage_prefix.split('/')[0],first.storage_prefix.split('/')[0]);
+  const otherRequest=(route,body)=>app.handle(new Request(`${app.origin}${route}`,{method:body?'POST':'GET',headers:{Origin:app.origin,Cookie:`lumiq_session=${session}`,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})}));
+  for(const route of [`/api/events/${first.id}`,`/api/events/${first.id}/qr?format=table`,`/api/covers/${first.id}`])assert.equal((await otherRequest(route)).status,404);
+  for(const route of [`/api/events/${first.id}/cover`,`/api/events/${first.id}/qr-background`])assert.equal((await otherRequest(route,{data})).status,404);
+  assert.equal((await app.events.own(user,first.id)).appearance.cover_key,coverKey);
+  assert.equal((await app.events.own(user,first.id)).appearance.qr_background_key,qrKey);
+  const migration=await readFile(new URL('../server/migrations/010-event-isolated-designs.sql',import.meta.url),'utf8');
+  await db.query(migration);
+  assert.deepEqual((await db.query('select design_defaults from accounts where id=$1',[user.id])).rows[0].design_defaults,{});
+  await app.events.action(user,first.id,{action:'delete',confirm:first.name});
+  await app.jobs.tick();
+  await assert.rejects(files.get(coverKey));
+  await assert.rejects(files.get(qrKey));
  }finally{await db.close();await rm(root,{recursive:true,force:true});}
 });
 

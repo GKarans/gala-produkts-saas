@@ -121,6 +121,7 @@ Ja Cloudflare prasa arī lokālās testēšanas izcelsmi, pievieno to tikai atse
 | `PLATFORM_ORIGIN` | `https://lumiq.cam` |
 | `PLATFORM_DATABASE_URL` | Jaunā Supabase ierobežotā servera DB loma, SSL savienojums |
 | `PLATFORM_SUPABASE_URL` | Jaunā projekta Supabase URL |
+| `PLATFORM_SUPABASE_PROJECT_REF` | Ne-slepenais Supabase projekta ID; jāsakrīt ar Auth URL un pirms deploy jāpārbauda pret Hyperdrive izcelsmes lietotāju |
 | `PLATFORM_SUPABASE_PUBLISHABLE_KEY` | Jaunā projekta publishable key |
 | `PLATFORM_SESSION_ENCRYPTION_KEY` | Render ģenerētais 64 heksadecimālu simbolu noslēpums |
 | `PLATFORM_R2_BUCKET` | Izveidotā bucket nosaukums |

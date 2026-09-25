@@ -1,5 +1,6 @@
 import {mkdir,writeFile,readFile,rm,stat} from 'node:fs/promises';
-import {createWriteStream} from 'node:fs';
+import {createReadStream,createWriteStream} from 'node:fs';
+import {Readable} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
 import path from 'node:path';
 import {S3Client,PutObjectCommand,GetObjectCommand,DeleteObjectCommand,HeadObjectCommand} from '@aws-sdk/client-s3';
@@ -19,6 +20,7 @@ export function storage(options={}){
   async put(key,bytes,type='image/webp'){valid(key);if(client){await client.send(new PutObjectCommand({Bucket:bucket,Key:key,Body:bytes,ContentType:type}));return;}await mkdir(path.dirname(location(key)),{recursive:true});await writeFile(location(key),bytes);},
   async putStream(key,stream,type='application/octet-stream'){valid(key);if(client){await new Upload({client,params:{Bucket:bucket,Key:key,Body:stream,ContentType:type}}).done();return;}await mkdir(path.dirname(location(key)),{recursive:true});await pipeline(stream,createWriteStream(location(key),{flags:'wx'}));},
   async get(key){valid(key);if(client){const r=await client.send(new GetObjectCommand({Bucket:bucket,Key:key}));return Buffer.from(await r.Body.transformToByteArray());}return readFile(location(key));},
+  async getStream(key){valid(key);if(client){const r=await client.send(new GetObjectCommand({Bucket:bucket,Key:key}));return r.Body.transformToWebStream();}return Readable.toWeb(createReadStream(location(key)));},
   async remove(key){valid(key);if(client)return client.send(new DeleteObjectCommand({Bucket:bucket,Key:key}));await rm(location(key),{force:true});},
   async signedPut(key,bytes,checksum){requireThat(client,400,'Direct storage is unavailable.');return getSignedUrl(client,new PutObjectCommand({Bucket:bucket,Key:valid(key),ContentType:'image/webp',ContentLength:bytes,ChecksumSHA256:checksum}),{expiresIn:300,unhoistableHeaders:new Set(['x-amz-checksum-sha256']),signableHeaders:new Set(['content-type','content-length'])});},
   async size(key){if(client)return(await client.send(new HeadObjectCommand({Bucket:bucket,Key:valid(key)}))).ContentLength;return(await stat(location(key))).size;}

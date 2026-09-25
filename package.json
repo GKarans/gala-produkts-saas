@@ -11,7 +11,7 @@
     "dev": "node platform/server/start.mjs",
     "start": "node platform/server/staging.mjs",
     "worker": "node platform/server/staging.mjs --worker",
-    "test": "node --test platform/tests/*.test.mjs",
+    "test": "node --test --test-concurrency=1 platform/tests/*.test.mjs",
     "test:ui": "node platform/tests/browser.cjs",
     "build": "node platform/scripts/build.mjs",
     "migrate": "node platform/scripts/migrate.mjs",
@@ -24,6 +24,7 @@
     "cost": "node platform/scripts/cost-model.mjs",
     "cloudflare:dev": "node platform/scripts/block-deploy.mjs --dev",
     "cloudflare:deploy": "node platform/scripts/block-deploy.mjs",
+    "production:preflight": "node platform/scripts/production-preflight.mjs",
     "check": "npm run security && npm run verify && npm run browser"
   },
   "dependencies": {

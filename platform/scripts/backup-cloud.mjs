@@ -1,15 +1,43 @@
 import {spawn} from 'node:child_process';
 import {mkdir,stat,writeFile} from 'node:fs/promises';
-import {createWriteStream} from 'node:fs';
+import {createReadStream,createWriteStream} from 'node:fs';
 import {pipeline} from 'node:stream/promises';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import postgres from 'postgres';
 import {S3Client,ListObjectsV2Command,GetObjectCommand} from '@aws-sdk/client-s3';
+import {waitForChildExit} from './restore-safety.mjs';
+import {captureTableInventory} from './restore-verification.mjs';
+
 const database=process.env.PLATFORM_DATABASE_URL,bucket=process.env.PLATFORM_R2_BUCKET,endpoint=process.env.PLATFORM_R2_ENDPOINT;
-if(!database||!bucket||!endpoint)throw new Error('Load isolated staging backup credentials first.');
-const stamp=new Date().toISOString().replace(/[:.]/g,'-'),root=path.resolve(process.argv[2]||`backups/lumiq-${stamp}`);await mkdir(path.join(root,'objects'),{recursive:true});
-const dump=path.join(root,'database.dump'),pg=spawn('pg_dump',['--format=custom','--no-owner','--no-acl','--file',dump,database],{stdio:'inherit',windowsHide:true});if(await new Promise(resolve=>pg.on('exit',resolve))!==0)throw new Error('pg_dump failed. Install PostgreSQL client tools and retry.');
-const databaseHash=createHash('sha256');for await(const chunk of createReadStream(dump))databaseHash.update(chunk);const databaseFile=await stat(dump);
-const s3=new S3Client({region:'auto',endpoint,credentials:{accessKeyId:process.env.PLATFORM_R2_ACCESS_KEY_ID,secretAccessKey:process.env.PLATFORM_R2_SECRET_ACCESS_KEY}}),objects=[];let token;
-do{const page=await s3.send(new ListObjectsV2Command({Bucket:bucket,ContinuationToken:token}));for(const item of page.Contents||[]){const result=await s3.send(new GetObjectCommand({Bucket:bucket,Key:item.Key})),target=path.join(root,'objects',encodeURIComponent(item.Key));await pipeline(result.Body,createWriteStream(target,{flags:'wx'}));const hash=createHash('sha256');for await(const chunk of (await import('node:fs')).createReadStream(target))hash.update(chunk);objects.push({key:item.Key,size:item.Size,etag:item.ETag,sha256:hash.digest('hex'),file:path.relative(root,target)});}token=page.NextContinuationToken;}while(token);
-await writeFile(path.join(root,'manifest.json'),JSON.stringify({created_at:new Date().toISOString(),bucket,database:{file:'database.dump',size:databaseFile.size,sha256:databaseHash.digest('hex')},objects},null,2));console.log(`Backup completed: ${root} (${objects.length} objects).`);
+if(!database||!bucket||!endpoint||!process.env.PLATFORM_R2_ACCESS_KEY_ID||!process.env.PLATFORM_R2_SECRET_ACCESS_KEY)throw new Error('Load isolated staging backup credentials first.');
+const stamp=new Date().toISOString().replace(/[:.]/g,'-'),root=path.resolve(process.argv[2]||`backups/lumiq-${stamp}`);
+await mkdir(path.join(root,'objects'),{recursive:true});
+
+const dump=path.join(root,'database.dump'),sql=postgres(database,{ssl:'require',max:1});
+let tableInventory;
+try{
+ await sql.begin('isolation level repeatable read, read only',async tx=>{
+  const snapshot=(await tx`select pg_export_snapshot() as id`)[0].id;
+  tableInventory=await captureTableInventory(tx);
+  const pg=spawn('pg_dump',['--format=custom','--no-owner','--no-acl',`--snapshot=${snapshot}`,'--file',dump,database],{stdio:'inherit',windowsHide:true});
+  if(await waitForChildExit(pg)!==0)throw new Error('pg_dump failed. Install PostgreSQL client tools and retry.');
+ });
+}finally{await sql.end();}
+
+const databaseHash=createHash('sha256');for await(const chunk of createReadStream(dump))databaseHash.update(chunk);
+const databaseFile=await stat(dump);
+const s3=new S3Client({region:'auto',endpoint,credentials:{accessKeyId:process.env.PLATFORM_R2_ACCESS_KEY_ID,secretAccessKey:process.env.PLATFORM_R2_SECRET_ACCESS_KEY}}),objects=[];
+let token;
+do{
+ const page=await s3.send(new ListObjectsV2Command({Bucket:bucket,ContinuationToken:token}));
+ for(const item of page.Contents||[]){
+  const result=await s3.send(new GetObjectCommand({Bucket:bucket,Key:item.Key})),target=path.join(root,'objects',encodeURIComponent(item.Key));
+  await pipeline(result.Body,createWriteStream(target,{flags:'wx'}));
+  const hash=createHash('sha256');for await(const chunk of createReadStream(target))hash.update(chunk);
+  objects.push({key:item.Key,size:item.Size,etag:item.ETag,sha256:hash.digest('hex'),file:path.relative(root,target)});
+ }
+ token=page.NextContinuationToken;
+}while(token);
+await writeFile(path.join(root,'manifest.json'),JSON.stringify({format_version:2,created_at:new Date().toISOString(),bucket,database:{file:'database.dump',size:databaseFile.size,sha256:databaseHash.digest('hex'),tables:tableInventory},objects},null,2));
+console.log(`Backup completed: ${root} (${tableInventory.length} tables, ${objects.length} R2 objects).`);

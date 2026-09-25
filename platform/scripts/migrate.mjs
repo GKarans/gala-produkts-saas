@@ -1,6 +1,7 @@
 import {openDatabase} from '../server/db.mjs';
+import {PLATFORM_MIGRATIONS} from '../server/migration-manifest.mjs';
 if(process.env.PLATFORM_MODE!=='staging'||process.env.PLATFORM_MIGRATE!=='1'||!process.env.PLATFORM_DATABASE_URL)throw new Error('Explicit isolated staging migration configuration is required.');
-const expected=['001-platform','002-delivery-leases','003-publication-allowances','004-account-profile','005-gallery-curation','006-r2-usage-guard','007-jsonb-parameter-encoding'];
+const expected=PLATFORM_MIGRATIONS.map(({version})=>version);
 const protectedTables=['accounts','sessions','auth_tokens','subscriptions','events','guests','media','jobs','orders','payment_events','deliveries','support_cases','audit','metrics','request_limits','r2_usage_guard','platform_migrations'];
 const db=await openDatabase();
 try{

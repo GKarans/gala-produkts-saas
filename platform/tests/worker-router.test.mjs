@@ -2,7 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {validateWebp} from '../../cloudflare/worker/src/webp-validation.js';
-import {createWorkerHandler} from '../../cloudflare/worker/src/router.js';
+import {createQueueConsumer,createWorkerHandler} from '../../cloudflare/worker/src/router.js';
+import worker,{assertMigrationsApplied,migrationVersions} from '../../cloudflare/worker/src/index.js';
+
+test('Worker startup requires every current platform migration',()=>{
+ const applied=new Set(migrationVersions);
+ assert.doesNotThrow(()=>assertMigrationsApplied(applied));
+ applied.delete('011-queue-job-dispatch');
+ assert.throws(()=>assertMigrationsApplied(applied),/Required database migrations are missing/);
+});
 
 test('Worker WebP validation accepts optimized photos and rejects malformed or oversized files',async()=>{
  const sample=await readFile(new URL('../public/assets/garden-gathering.webp',import.meta.url));
@@ -24,10 +32,11 @@ test('Worker forwards API requests and reports database health',async()=>{
   db:{query:async sql=>{seen.push(sql);return{rows:[{ready:1}]};},close:async()=>{seen.push('closed');}},
   handle:async request=>{seen.push(new URL(request.url).pathname);return new Response('api response');}
  }));
- const api=await handler.fetch(new Request('https://lumiq.cam/api/config'),{});
+ const env={PLATFORM_MODE:'staging',PLATFORM_RELEASE_APPROVED:'staging'};
+ const api=await handler.fetch(new Request('https://lumiq.cam/api/config'),env);
  assert.equal(api.status,200);
  assert.equal(await api.text(),'api response');
- const health=await handler.fetch(new Request('https://lumiq.cam/healthz'),{});
+ const health=await handler.fetch(new Request('https://lumiq.cam/healthz'),env);
  assert.equal(health.status,200);
  assert.deepEqual(await health.json(),{status:'ok',service:'lumiq-cam',database:'ready',storage:'bound'});
  assert.deepEqual(seen,['/api/config','closed','select 1 as ready','closed']);
@@ -35,12 +44,58 @@ test('Worker forwards API requests and reports database health',async()=>{
 
 test('Worker serves assets and gives a closed 503 when backend setup is unavailable',async()=>{
  const handler=createWorkerHandler(async()=>{throw new Error('private configuration detail');});
- const page=await handler.fetch(new Request('https://lumiq.cam/'),{ASSETS:{fetch:async()=>new Response('static app')}});
+ const env={PLATFORM_MODE:'staging',PLATFORM_RELEASE_APPROVED:'staging',ASSETS:{fetch:async()=>new Response('static app')}};
+ const page=await handler.fetch(new Request('https://lumiq.cam/'),env);
  assert.equal(await page.text(),'static app');
- const api=await handler.fetch(new Request('https://lumiq.cam/api/config'),{});
+ const api=await handler.fetch(new Request('https://lumiq.cam/api/config'),env);
  assert.equal(api.status,503);
  assert.deepEqual(await api.json(),{error:'Lumiq backend is temporarily unavailable.'});
- const health=await handler.fetch(new Request('https://lumiq.cam/healthz'),{});
+ const health=await handler.fetch(new Request('https://lumiq.cam/healthz'),env);
  assert.equal(health.status,503);
  assert.equal((await health.json()).database,'unavailable');
+});
+
+test('Worker release gate blocks assets, API and health unless mode and approval match',async()=>{
+ let appCalls=0,assetCalls=0;
+ const handler=createWorkerHandler(async()=>{appCalls++;throw new Error('must stay closed');});
+ for(const env of [
+  {},
+  {PLATFORM_MODE:'production',PLATFORM_RELEASE_APPROVED:'staging'},
+  {PLATFORM_MODE:'staging',PLATFORM_RELEASE_APPROVED:'production'}
+ ]){
+  const gatedEnv={...env,ASSETS:{fetch:async()=>{assetCalls++;return new Response('static app');}}};
+  for(const path of ['/','/api/config','/healthz']){
+   const response=await handler.fetch(new Request(`https://lumiq.cam${path}`),gatedEnv);
+   assert.equal(response.status,503,`${path} should remain closed for ${JSON.stringify(env)}`);
+   assert.deepEqual(await response.json(),{error:'Lumiq is not available.'});
+  }
+ }
+ assert.equal(appCalls,0);
+ assert.equal(assetCalls,0);
+});
+
+test('Worker release gate also blocks scheduled database and mail work',async()=>{
+ let scheduled=0;
+ const context={waitUntil:()=>{scheduled++;}};
+ for(const env of [
+  {PLATFORM_MODE:'production',PLATFORM_RELEASE_APPROVED:'staging'},
+  {PLATFORM_MODE:'staging',PLATFORM_RELEASE_APPROVED:'production'},
+  {PLATFORM_MODE:'production'}
+ ]){
+  await worker.scheduled({}, {...env,HYPERDRIVE:{connectionString:'unused-test-connection'}}, context);
+ }
+ assert.equal(scheduled,0);
+});
+
+test('queue consumer runs only valid targeted jobs, closes DB and retries startup failures',async()=>{
+ const calls=[],deadLetters=[],makeMessage=body=>({body,acked:false,retried:null,ack(){this.acked=true;},retry(options){this.retried=options;}});
+ const id='d4f6c64d-9065-4c42-9a48-cbac690b106d',valid=makeMessage({jobId:id}),invalid=makeMessage({jobId:'not-a-uuid'}),closed=[];
+ const consumer=createQueueConsumer(async()=>({jobs:{tick:async options=>calls.push(options),deadLetter:async jobId=>deadLetters.push(jobId)},db:{close:async()=>closed.push(true)}}));
+ await consumer({messages:[valid,invalid]},{PLATFORM_MODE:'staging',PLATFORM_RELEASE_APPROVED:'staging'});
+ assert.deepEqual(calls,[{concurrency:1,maxJobs:1,jobIds:[id]}]);assert.equal(valid.acked,true);assert.equal(invalid.acked,true);assert.equal(closed.length,1);
+ const poison=makeMessage({jobId:id});await consumer({queue:'test-jobs-dlq',messages:[poison]},{PLATFORM_MODE:'staging',PLATFORM_RELEASE_APPROVED:'staging',LUMIQ_JOBS_DLQ_NAME:'test-jobs-dlq'});assert.deepEqual(deadLetters,[id]);assert.equal(poison.acked,true);
+ const blocked=makeMessage({jobId:id});await consumer({messages:[blocked]},{PLATFORM_MODE:'production',PLATFORM_RELEASE_APPROVED:'staging'});assert.deepEqual(blocked.retried,{delaySeconds:60});
+ const unavailable=makeMessage({jobId:id}),original=console.error;console.error=()=>{};
+ try{await createQueueConsumer(async()=>{throw new Error('offline');})({messages:[unavailable]},{PLATFORM_MODE:'staging',PLATFORM_RELEASE_APPROVED:'staging'});}finally{console.error=original;}
+ assert.deepEqual(unavailable.retried,{delaySeconds:60});
 });

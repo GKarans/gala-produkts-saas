@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,readFile,rm,rename,symlink} from 'node:fs/promises';
+import {Readable} from 'node:stream';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
+import {assertObjectInventory,assertTableInventory} from '../scripts/restore-verification.mjs';
 
 const script=path.resolve('platform/scripts/verify-backup.mjs');
 async function fixture(){
@@ -14,7 +16,7 @@ async function fixture(){
  await mkdir(path.join(root,'objects'));
  await writeFile(path.join(root,'objects/photo.webp'),object);
  const digest=data=>createHash('sha256').update(data).digest('hex');
- await writeFile(path.join(root,'manifest.json'),JSON.stringify({database:{file:'database.dump',size:database.length,sha256:digest(database)},objects:[{key:'event/photo.webp',file:'objects/photo.webp',size:object.length,sha256:digest(object)}]}));
+ await writeFile(path.join(root,'manifest.json'),JSON.stringify({format_version:2,database:{file:'database.dump',size:database.length,sha256:digest(database),tables:[{schema:'public',name:'accounts',rows:'1'}]},objects:[{key:'event/photo.webp',file:'objects/photo.webp',size:object.length,sha256:digest(object)}]}));
  return root;
 }
 function verify(root){return spawnSync(process.execPath,[script,root],{encoding:'utf8'});}
@@ -40,4 +42,21 @@ test('backup verifier rejects a manifest path escaping through a directory symli
  try{await symlink(externalObjects,objects,process.platform==='win32'?'junction':'dir');}
  catch(error){if(['EPERM','EACCES','ENOTSUP','EINVAL'].includes(error.code)){t.skip(`Directory symlinks are unavailable: ${error.code}`);return;}throw error;}
  const result=verify(root);assert.notEqual(result.status,0);assert.match(result.stderr,/escapes its directory/);
+});
+
+test('restore compares the complete public table row inventory',async()=>{
+ const sql=async()=>[{schemaname:'public',tablename:'accounts'}];sql.unsafe=async()=>[{row_count:'1'}];
+ assert.equal(await assertTableInventory(sql,[{schema:'public',name:'accounts',rows:'1'}]),1);
+ await assert.rejects(assertTableInventory(sql,[{schema:'public',name:'accounts',rows:'2'}]),/table inventory does not match/);
+ await assert.rejects(assertTableInventory(sql,[]),/table inventory does not match/);
+});
+
+test('restore verifies exact R2 key, size and stream checksum inventory',async()=>{
+ const bytes=Buffer.from('photo data'),digest=createHash('sha256').update(bytes).digest('hex'),expected=[{key:'event/photo.webp',size:bytes.length,sha256:digest}];
+ const listPage=async()=>({Contents:[{Key:'event/photo.webp',Size:bytes.length}]});
+ const getObject=async()=>({Body:Readable.from([bytes.subarray(0,3),bytes.subarray(3)])});
+ assert.equal(await assertObjectInventory({bucket:'isolated',expected,listPage,getObject}),1);
+ await assert.rejects(assertObjectInventory({bucket:'isolated',expected,listPage:async()=>({Contents:[]}),getObject}),/key and size inventory/);
+ await assert.rejects(assertObjectInventory({bucket:'isolated',expected,listPage:async()=>({Contents:[{Key:'event/photo.webp',Size:bytes.length+1}]}),getObject}),/key and size inventory/);
+ await assert.rejects(assertObjectInventory({bucket:'isolated',expected,listPage,getObject:async()=>({Body:Readable.from([Buffer.from('corrupt')])})}),/checksum mismatch/);
 });

@@ -1,10 +1,12 @@
-import {cp,mkdir,readFile,writeFile,readdir} from 'node:fs/promises';
+import {cp,mkdir,readFile,writeFile,readdir,rm} from 'node:fs/promises';
 import path from 'node:path';
 import {ROOT} from '../server/db.mjs';
 import {VERSION} from '../shared/plans.js';
 
 // Only the public surface is packaged. No environment, database or reference files.
-const destination=path.join(ROOT,'dist');
+const destination=path.resolve(ROOT,'dist');
+if(path.basename(destination)!=='dist'||destination===path.parse(destination).root)throw new Error('Unsafe build output path.');
+await rm(destination,{recursive:true,force:true});
 await mkdir(destination,{recursive:true});
 await cp(path.join(ROOT,'public'),destination,{recursive:true,filter:source=>!source.endsWith('.png')||source.endsWith(path.join('assets','brand-mark.png'))});
 await mkdir(path.join(destination,'shared'),{recursive:true});

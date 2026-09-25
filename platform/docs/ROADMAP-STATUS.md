@@ -64,6 +64,8 @@ LOCAL = implemented locally, with the evidence described in TESTING.md. PARTIAL 
 | I4, I5 | MANUAL | Real independent full journey and provider renewal/cancel evidence required |
 | I6 | LOCAL / MANUAL | Owner/CSRF/limits/cleanup/recovery/payment tests local; provider and independent review still required |
 | I7 | MANUAL | No paid pilot or public launch performed |
+| J1 | PROPOSED | QR poster designer v2: replace current editor when prioritized; event-only backgrounds/uploads, canvas editing and protected fresh QR layer. Preserve scan-safe export; no design inheritance |
+| J2 | PROPOSED | Expand organizer guest-page appearance controls and responsive preview, separate from the QR poster editor. Guest-side photo editing is out of scope |
 
 ## What is not claimed
 

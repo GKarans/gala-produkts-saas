@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
 import { S3Client, PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { assertEmptyPublicSchema, validateRestoreTarget, waitForChildExit } from './restore-safety.mjs';
+import {assertObjectInventory,assertTableInventory} from './restore-verification.mjs';
 
 if (process.env.PLATFORM_RESTORE_DRILL !== 'EMPTY-ISOLATED-TARGET') {
   throw new Error('Set PLATFORM_RESTORE_DRILL=EMPTY-ISOLATED-TARGET only for a new empty drill environment.');
@@ -17,7 +18,7 @@ if (!backupDirectory) throw new Error('Usage: node platform/scripts/restore-dril
 const database = process.env.PLATFORM_DATABASE_URL;
 const bucket = process.env.PLATFORM_R2_BUCKET;
 const endpoint = process.env.PLATFORM_R2_ENDPOINT;
-if (!database || !bucket || !endpoint) throw new Error('Load the empty restore target credentials.');
+if (!database || !bucket || !endpoint || !process.env.PLATFORM_R2_ACCESS_KEY_ID || !process.env.PLATFORM_R2_SECRET_ACCESS_KEY) throw new Error('Load the empty restore target credentials.');
 validateRestoreTarget(database, process.env.PLATFORM_RESTORE_TARGET_REF);
 
 const root = path.resolve(backupDirectory);
@@ -61,6 +62,10 @@ if (await waitForChildExit(pgRestore) !== 0) {
   throw new Error('Database restore failed. Install PostgreSQL client tools and retry.');
 }
 
+const restoredDb=postgres(database,{ssl:'require',max:1});
+let restoredTables;
+try{restoredTables=await assertTableInventory(restoredDb,manifest.database.tables);}finally{await restoredDb.end();}
+
 for (const object of manifest.objects) {
   await s3.send(new PutObjectCommand({
     Bucket: bucket,
@@ -68,4 +73,6 @@ for (const object of manifest.objects) {
     Body: createReadStream(path.join(root, object.file))
   }));
 }
-console.log(`Restore drill loaded the database and ${manifest.objects.length} objects. Run migrations, application smoke tests and checksum verification before recording success.`);
+const restoredObjects=await assertObjectInventory({s3,bucket,expected:manifest.objects});
+console.log(`Restore verified: ${restoredTables} public tables match row counts; all ${restoredObjects} R2 objects match keys, sizes and SHA-256 checksums.`);
+console.log('Still run the migration verifier, application smoke tests and a sample ZIP extraction before recording the full drill as complete.');

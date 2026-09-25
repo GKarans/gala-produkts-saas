@@ -1,6 +1,6 @@
 # Bezmaksas slēgtais tests
 
-Updated: 2026-09-23. Current scope approved by the owner: $0 closed test only.
+Updated: 2026-09-24. Current scope approved by the owner: $0 closed test only.
 This is not production approval. Do not start paid plans, invite public users,
 accept payments, or collect real guest photos.
 
@@ -51,8 +51,9 @@ limit.
    Direct host, so use Supabase **Connect → Session pooler** on port 5432.
    Copy the full Session pooler URI (username `postgres.<project-ref>`). Do not
    use Transaction pooler on port 6543. The script displays the project
-   reference parsed from the URI and requires you to type only that reference
-   at the confirmation prompt. Do not include `postgres.` or the pooler host.
+   reference parsed from the URI, rejects any project other than the pinned
+   closed-test project, and requires you to type only that reference at the
+   confirmation prompt. Do not include `postgres.` or the pooler host.
    A blank or incomplete connection URI is rejected before any database access.
    Enter the connection URL only into the hidden terminal prompt below, never
    into chat, a file, or a screenshot:
@@ -61,10 +62,10 @@ limit.
    .\platform\scripts\migrate-new-test.ps1
    ```
 
-   The owner reran this script and verified `001-platform` through
-   `006-r2-usage-guard`, RLS on all 17 protected tables, and no SELECT access
-   for `anon` or `authenticated`. The output confirmed no MVP migration ran.
-   The script clears temporary environment variables even if migration fails.
+   The initial foundation run verified `001-platform` through
+   `006-r2-usage-guard`; later forward migrations are tracked under Current
+   status below. The output confirmed no MVP migration ran. The script clears
+   temporary environment variables even if migration fails.
    Do not run MVP-specific SQL.
 3. Create the restricted application DB login after migrations:
 
@@ -117,13 +118,26 @@ limit.
 7. Add the new project's Supabase URL and publishable key and a newly generated
    session encryption key as Worker secrets for the closed-test Worker only.
    Keep all secrets out of the repository and chat. The session encryption
-   key, Supabase URL and publishable key are configured. The owner verified
+   key, Supabase URL and publishable key are configured. Set the non-secret
+   `PLATFORM_SUPABASE_PROJECT_REF` in the ignored closed-test Wrangler config;
+   verify that it matches the Supabase URL and the origin username reported by
+   `npx wrangler hyperdrive get <test-hyperdrive-id>`. Hyperdrive's runtime
+   connection string can contain generated credentials, so do not infer the
+   origin project from its runtime username. The owner verified
    authenticated health and database readiness on 2026-09-23; the endpoint
    returned `status: ok`, `database: ready`, and `storage: bound`.
 8. Build and deploy only with the separate test config, for example:
 
+   For the current source, do not run the deployment until
+   `migrate-new-test.ps1` reports all 11 migrations verified. Queue bindings
+   are intentionally absent for this first deployment; scheduled database
+   polling remains enabled. Then run the local checks and inspect the dry-run
+   bindings before the command below. The base `npm run cloudflare:deploy`
+   alias is intentionally blocked because it targets `lumiq.cam`.
+
    ```powershell
-   npm run build
+   npm run check
+   npx wrangler deploy --dry-run --config cloudflare/worker/wrangler.closed-test.jsonc
    npx wrangler deploy --config cloudflare/worker/wrangler.closed-test.jsonc
    ```
 
@@ -245,64 +259,207 @@ limit.
    closed-test config. The upload reservation test is local evidence only; the
    live R2 upload has not completed.
 
-## Not yet ready to deploy
+## Current status
 
-- The owner created a separate Supabase Free project. The latest migration
-  script output verified versions `001-platform` through `007-jsonb-parameter-encoding`,
-  RLS on 17 tables, denied `anon`/`authenticated` SELECT, and confirmed no MVP
-  migration ran. Project identifiers and connection credentials are
-  intentionally not copied into this repository.
-- A previous Direct-host attempt failed at Node DNS resolution (`ENOTFOUND`);
-  the later Session-pooler migration run completed. Do not rerun migrations
-  unless the version/access checks show a missing migration.
-- The owner reports `lumiq_runtime` was created and passed the provisioning
-  script's privilege checks. A separate Hyperdrive targets that role, and the
-  owner-authenticated `/healthz` verified its query path. Do not point
-  Hyperdrive at the `postgres` admin role.
-- A separate `lumiq-closed-test-photos` R2 bucket has been created and verified
-  in the authenticated Cloudflare account. It now contains only two verified
-  Balle design objects (`covers/` and `qr/`); no guest photo is present. A
-  separate synthetic test event was published and consumed the sole remaining
-  Explore allowance, but its gallery remains at 0 photos and the event has
-  ended. A free 30-day Gathering exception for this account is approved but
-  awaits the owner's guarded database update; no new event has been created.
-  The test Hyperdrive
-  is configured with caching disabled and a
-  five-connection origin limit. The ignored local Worker config binds it and
-  the separate test bucket; Wrangler dry-run passed. The base Worker config is
-  staging-only and must not be reused.
-- The exact test `workers.dev` origin is configured and the separately named
-  Worker is deployed. An anonymous request was confirmed to redirect to
-  Cloudflare Access before reaching Worker code. The hostname Access
-  application and owner allow rule are visible in the owner's dashboard. After
-  Worker version `636cb1e2-2e0e-49d3-914e-47f335f0239f` was deployed, the owner
-  rechecked `/healthz` through Access and confirmed database/storage readiness;
-  the owner also confirmed draft event `Balle` persisted after returning to
-  the app. Code-side Auth redirect checks passed 14/14 locally and use the
-  configured test origin; the Supabase dashboard allowlist, email templates,
-  live recovery/OAuth and staging-data isolation remain unverified.
-- `PLATFORM_SESSION_ENCRYPTION_KEY`, `PLATFORM_SUPABASE_URL` and
-  `PLATFORM_SUPABASE_PUBLISHABLE_KEY` are configured as Worker Secrets. The
-  owner verified `/healthz` through Access and the Supabase/Hyperdrive query
-  succeeded. Continue with test-only Auth and synthetic event checks; first
-  verify requests cannot reach staging data. No photos have been uploaded.
-- R2 operation and lifetime-byte limits are implemented in the Worker adapter
-  and pass local tests; the guard is deployed in Worker version
-  `636cb1e2-2e0e-49d3-914e-47f335f0239f`. Anonymous Access still blocks both
-  `/` and `/healthz`. The owner confirmed authenticated health on that version.
-  Account-level R2 usage has been rechecked: 34.62 MB total storage, `$0.00`
-  billable usage, 388 Class A and 1.13k Class B for the current billing period.
-  The test bucket has 2 design objects / 144.71 kB under Balle, not photos;
-  staging remains at 11 objects / 501.9 kB. The JSONB fix is deployed in
-  Worker version `f5f4c65d-446f-49a4-a48c-9d1716d73d4e`; the later billing UI
-  fix was deployed as `b1b7fe9e-78a4-4e7a-a422-4a506d63608f`. Authenticated
-  `/app/billing` is now verified on that version and still shows Explore
-  `1 / 1`, payments disabled. The owner has authorized a closed-test-only free
-  30-day Gathering exception, but the guarded DB update has not been run yet.
-  Do not create another event until the UI confirms four remaining
-  publications. The expired synthetic event remains at 0 guest photos, so the
-  authorized R2 photo test is not complete.
-- A closed test does not satisfy the production release gates in
-  `LAUNCH-GATES.md`; production still requires a separate owner approval and
-  verified infrastructure, backup/restore, security, reliability and legal
-  gates.
+This section supersedes earlier pending statements above where the test state
+has since changed. It is still a closed test, not production approval.
+
+- The test-only Supabase Free database has migrations `001-platform` through
+  `011-queue-job-dispatch`; RLS is enabled on 17 platform tables and
+  `anon`/`authenticated` SELECT is denied. `lumiq_runtime` and the separate
+  test Hyperdrive were provisioned and checked. No MVP migration or production
+  migration was run. The test project reference is pinned in the migration
+  guard; database credentials must never be copied into this repo.
+- The separate closed-test Worker uses only its test Hyperdrive and private
+  `lumiq-closed-test-photos` bucket. It remains behind the owner's Cloudflare
+  Access policy. The latest read-only Wrangler listing on 2026-09-25 reports
+  version `79cf3383-7f49-475b-a9b5-b4e7fa2e5b5a` at 100%. Payments remain
+  disabled. The root `lumiq-cam` Worker is a separate staging deployment.
+- The owner applied the approved free, account-specific Gathering exception
+  in the test database. The authenticated billing page showed `Gathering
+  trialing`, `1 / 4` publications used and `3` remaining after the new test
+  event was published. No paid plan or payment method is connected.
+- On 2026-09-24, the owner created and published `Synthetic R2 Upload Test
+  2026-09-24`, then supplied one test image. The guest page reported
+  `1 uploaded · 0 need attention` and `Photo uploaded!` at 100%; the organizer
+  gallery showed `1 of 1 photos` with a loaded thumbnail. Uploads were paused
+  after verification. A later synthetic upload, legacy test-photo cleanup and
+  automatic ZIP run are recorded below. These verify only the narrow closed-
+  test paths described there, not the full R2 failure/retry, privacy,
+  sharing-revocation or retention matrix.
+- Post-upload Cloudflare R2 dashboard evidence on 2026-09-24: a later account
+  overview showed `35.37 MB` total storage, `$0.00` billable usage for
+  2026-09-12 through 2026-10-12, and account totals of 580 Class A / 1.29k
+  Class B operations. The private `lumiq-closed-test-photos` bucket showed
+  4 objects, with Public Access Disabled. Its overview listed `263.25 kB`,
+  while bucket detail showed `265.03 KB`; this display discrepancy is
+  unresolved. The synthetic event's guest prefix contains the uploaded
+  `image/webp` original (`109.69 KB`) and its `image/webp` thumbnail
+  (`10.57 KB`); the organizer gallery read that thumbnail. The bucket's other
+  objects include the existing `Balle` assets. Account totals differ from the
+  earlier screenshot baseline (`34.62 MB`, 388 Class A / 1.13k Class B), but
+  other account activity may contribute, so that delta is not attributed only
+  to this photo test. Preserve the `Balle` cover and QR design assets.
+- An earlier source snapshot passed `npm run check` on 2026-09-24: secret scan
+  across 162 tracked files, `npm audit` with 0 vulnerabilities, 78/78 Node
+  tests, a 62-file public build, browser checks at 320/390/768/1440px,
+  organizer/guest/designer/billing/refinement journeys, and
+  accessibility/keyboard/reduced-motion/200% zoom checks. This verifies local
+  source only, not the deployed closed-test bundle or production target. The
+  latest source, including the Worker-edge release-approval check for static
+  assets, API, health and scheduled work, is deployed only to the closed-test
+  Worker as version `4be484be-e646-44e0-a861-f00022e6cdad`; Wrangler reports
+  100% traffic. This deployment did not change `lumiq-cam` or `lumiq.cam`.
+  Anonymous `GET /healthz` to the closed-test workers.dev host returned HTTP
+  302 with `Www-Authenticate: Cloudflare-Access`; the authenticated health
+  endpoint could not be reopened in the in-app browser in this check, so its
+  current response is not claimed verified. No production deploy.
+- Historical local source verification (2026-09-24): `npm run check` passed with
+  85/85 Node tests, secret scan of 162 tracked files, 0 `npm audit`
+  vulnerabilities, and a clean 53-file public build. The tests include the
+  new optional Queue dispatch, duplicate/retry recovery and shared 11-version
+  migration manifest. A Wrangler dry run against
+  `wrangler.closed-test.jsonc` read 59 asset files and resolved only the test
+  Hyperdrive and private test bucket; no Queue binding was added and no deploy
+  occurred. The source now requires migration `011-queue-job-dispatch`, while
+  the deployed closed-test Worker and database remain at the previously
+  recorded state through migration `010`. This historical deployment note is
+  superseded by the 2026-09-25 release and retest entries below. Queue bindings
+  remain disabled; the database polling fallback is active. A separate
+  reviewed capacity/cost decision is required before provisioning or enabling
+  Cloudflare Queues or a paid plan.
+- A later local change adds organizer/event R2 prefixes and a separate `thumb/`
+  folder for new photo pairs. The planned key shape is
+  `<organizer>-<6>/events/<event>-<6>/<guest>-<capture-time>-<6>.webp`, with
+  thumbnails under that event's `thumb/`; event-bound cover and QR design
+  uploads go under `<organizer>-<6>/cover/`. Each new event starts with its own
+  selected bundled cover and a fresh QR layout. The organizer can replace
+  either after creation. Uploaded covers and finished Canva posters remain
+  attached only to their own event; a Canva poster already contains that
+  event's QR code and must be edited in Canva and re-uploaded for another
+  event. Photo time currently comes from the
+  browser File `lastModified` metadata, with server receive time as fallback;
+  it is not guaranteed to be the camera's EXIF capture time. Existing rows keep
+  their full object keys. No legacy customer objects were re-keyed; the two
+  obsolete synthetic event-root test photos were deleted during the later
+  retest below. Forward
+  migration `008-organized-r2-keys` adds the owner prefix and `captured_at`
+  columns; `009-organizer-design-defaults` is retained for migration checksum
+  compatibility but its column is no longer used; `010-event-isolated-designs`
+  clears any saved cross-event defaults. On 2026-09-24 the owner confirmed the
+  guarded migration script verified all ten migrations on the closed-test DB.
+  Fresh read-only Wrangler output reports Worker version
+  `5f6e4034-9b99-4567-b607-02472801a029` at 100%, using the test Hyperdrive
+  and `lumiq-closed-test-photos` bucket. Re-keying old objects needs a separate
+  copy and checksum-verified migration; preserve the existing `Balle` design
+  assets. New key paths and event design isolation still need live R2
+  verification.
+- A QR editor regression check uploads two different finished Canva
+  posters to one event without reloading the page and verifies that the
+  rendered preview changes immediately. The fix gives each opened editor a
+  fresh preview URL. The new-event form starts with a selected bundled cover;
+  it no longer offers "Current photo" before an event has its own cover. These
+  fix is deployed to the closed-test Worker. The workspace also now opens an
+  event by clicking its row; mobile navigation uses one menu button for
+  sections, language, theme and sign-out. The event-list return link has a
+  mobile-sized touch target.
+- Supabase Auth URL Configuration was updated on 2026-09-24 in the test
+  project: Site URL is the closed-test workers.dev origin, and exactly
+  `/auth/verify`, `/auth/reset`, `/auth/email`, and
+  `/api/auth/google/callback` are allowed on that host. Signup and email
+  confirmation are enabled; Google OAuth is disabled. Default email templates
+  remain in use; Supabase requires custom SMTP to edit them, and no SMTP was
+  configured. The reset screen now requires the new password twice and rejects
+  a mismatch. Local browser journey tests mismatch and successful reset; fake
+  Supabase adapter tests cover recovery access-token and token-hash links. The
+  change is deployed only to closed-test Worker version
+  `5f6e4034-9b99-4567-b607-02472801a029`; `lumiq-cam` remains at
+  `4e9ace8c-dc93-4451-85e2-2e03bbe8138e`. No live signup, mailbox delivery,
+  real Supabase reset, email-change or concurrent-refresh flow has been
+  exercised.
+- Still unverified for the closed test: proof that test requests cannot access staging data; complete R2
+  denial/retry/revocation cases; multi-instance limiter and trusted proxy
+  behavior; alerts, capacity, accessibility on physical devices, and a full
+  backup/restore drill.
+- ZIP export generation writes 64 KiB chunks and waits for stream backpressure; organizer ZIP downloads stream directly from object storage rather than buffering each full archive part in Worker memory. Local stress coverage exports the full 1,000-photo Studio limit into two ZIPs (72,056,284 bytes in the latest run), verifies every manifest ID and asserts queued stream data remains below 2 MiB with a throttled local sink. Optional Queue dispatch can publish up to 1,000 bounded job messages/minute (100 per API batch); without the Queue binding, cron polling falls back to 10 jobs/minute. Queue dispatch is implemented but no Cloudflare Queue binding is configured: this test Worker uses the database cron polling fallback. Workers Free allows 10 ms CPU per invocation. Verify actual ZIP CPU, memory, R2 behavior and load before enabling a Queue or paid plan.
+- Closed-test Worker version `5f6e4034-9b99-4567-b607-02472801a029` is at 100%, confirmed by `wrangler deployments list` on 2026-09-24. The `lumiq-cam` Worker remains at `4e9ace8c-dc93-4451-85e2-2e03bbe8138e`.
+- Production remains unprovisioned and unauthorized for spending. The test
+  does not satisfy `LAUNCH-GATES.md`; production still requires separately
+  approved infrastructure, production-only migrations and backup/restore,
+  independent security review, reliability/capacity evidence and owner/legal
+  decisions. Do not set production release flags or point `lumiq.cam` at the
+  test stack.
+
+## 2026-09-25 closed-test release
+
+- The owner applied guarded migration `011-queue-job-dispatch` to Supabase
+  project `cpweowosocjuccjsyyic`. Reported versions 001-011 verified, RLS is
+  enabled, anonymous/authenticated SELECT is denied on 17 tables, and no MVP
+  migration ran. This is evidence for the isolated test database only.
+- `npm run check` passed after that confirmation: 85/85 tests, security scan
+  across 162 tracked files, `npm audit` with 0 vulnerabilities, build of 53
+  public files, browser checks at 320/390/768/1440 px, organizer/guest/billing/
+  designer journeys and automated accessibility checks.
+- Closed-test Wrangler dry-run resolved only Hyperdrive
+  `6823aef81a314970bd3da962c2a62966`, bucket
+  `lumiq-closed-test-photos`, and static assets. On 2026-09-25 version
+  `c5f255b0-1f45-44a0-a9ba-b4d9128498c7` was deployed at 100% to
+  `lumiq-closed-test`. Queue is intentionally not bound. Deployment listing
+  confirmed the new version at 100%. `lumiq-cam` / `lumiq.cam` was not changed.
+- Still required: owner-authenticated `/healthz` check (`database: ready`,
+  `storage: bound`) and a fresh closed-test browser smoke test after this
+  release. The automated checks are local; they do not establish live guest
+  upload, end-of-event ZIP generation, Queue operation, backup/restore,
+  physical-device or production readiness.
+
+### 2026-09-25 guest-folder upload and automatic ZIP retest
+
+- Uploaded one generated `party.webp` through the guest page of the synthetic
+  R2 layout event. The organizer gallery showed one newly uploaded photo.
+- Confirmed in the Cloudflare dashboard that the original and thumbnail use
+  the event's `guntars-2cc156/` folder, with the thumbnail in its nested
+  `thumb/` folder. Deleted the two prior event-root photos in the application;
+  after background cleanup, their originals and the old event-root `thumb/`
+  were absent from R2. The new guest-folder pair remained.
+- The automatic event-end ZIP exposed a Cloudflare R2 runtime requirement:
+  stream bodies must have a known content length. Updated ZIP sizing and R2
+  stream writes to use a bounded `FixedLengthStream`; the archive then reached
+  `ready` with one photo and is available until 2026-10-09 15:40 Europe/Riga.
+- ZIP download filenames now use the organizer (or business) name, event name
+  and part number, normalized for safe filenames (for example,
+  `guntars-karans-balle-1.zip`) instead of the generic `event-photos-1.zip`.
+  The download endpoint derives the name at request time, so already-prepared
+  ZIPs also receive the new name without rebuilding their contents. Local test
+  simulates an old saved `event-photos-1.zip` result and confirms the response
+  header uses the current organizer/event filename.
+- Local post-fix focused checks passed 32/32; the build validated 53 public
+  files. The archive completed under closed-test Worker `bb1fa5ae-6a20-464f-8bb2-bbf75594e325`.
+  Then temporary stack-trace logging was removed; final closed-test Worker
+  `14201856-ee27-4ad7-b159-2903c93f8c6d` is verified at 100%. The `lumiq-cam`
+  Worker remained on its separate version.
+- This is one small closed-test upload and ZIP only, not production capacity,
+  Queue, device, backup/restore or security-review evidence.
+
+### 2026-09-25 full local check and latest closed-test state
+
+- The current working tree passed `npm run check`: 88/88 Node tests, secret
+  scan across 162 tracked files, `npm audit` with 0 vulnerabilities, build of
+  53 public files, responsive checks at 320/360/375/390/430/500/768/1024/1440
+  px, organizer/guest/designer/billing/refinement browser journeys, and axe,
+  keyboard, reduced-motion and 200% zoom checks. The isolated browser suite
+  used its own fixtures, not the live preview data.
+- The latest closed-test Worker is `79cf3383-7f49-475b-a9b5-b4e7fa2e5b5a`
+  at 100%; deployment dry-run resolved only the closed-test Hyperdrive and
+  private test bucket. The new filename behavior is deployed; an authenticated
+  live download response has not yet been manually inspected.
+  `lumiq-cam` and the `lumiq.cam` route were not changed. The live synthetic
+  event contains one new photo in its photographer folder with a nested
+  `thumb/`; the two obsolete event-root synthetic pairs were removed and the
+  automatic one-photo ZIP reached `ready`, retained until 2026-10-09 15:40
+  Europe/Riga. This confirms a small closed-test success path, not load or
+  production readiness.
+- No new production resource was created, paid service approved, production
+  migration run, or production Worker/domain changed. Queue bindings remain
+  disabled. Auth email delivery, full privacy/revocation matrix, physical
+  devices, load/cost limits, independent security review and a real isolated
+  DB+R2 restore drill remain open.

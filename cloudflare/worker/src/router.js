@@ -1,3 +1,5 @@
+import {isReleaseApproved} from "../../../platform/shared/release.js";
+
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
@@ -29,6 +31,9 @@ async function withApp(getApp, env, action) {
 export function createWorkerHandler(getApp) {
   return {
     async fetch(request, env) {
+      if (!isReleaseApproved(env.PLATFORM_MODE, env.PLATFORM_RELEASE_APPROVED)) {
+        return json({error: "Lumiq is not available."}, 503);
+      }
       const url = new URL(request.url);
 
       if (url.pathname === "/healthz") {
@@ -53,6 +58,36 @@ export function createWorkerHandler(getApp) {
       }
 
       return env.ASSETS.fetch(request);
+    }
+  };
+}
+
+export function createQueueConsumer(getApp) {
+  return async (batch, env) => {
+    const deadLetter = typeof env.LUMIQ_JOBS_DLQ_NAME === "string" && batch.queue === env.LUMIQ_JOBS_DLQ_NAME;
+    const retry = message => message.retry({delaySeconds: 60});
+    if (!isReleaseApproved(env.PLATFORM_MODE, env.PLATFORM_RELEASE_APPROVED)) {
+      for (const message of batch.messages) retry(message);
+      return;
+    }
+    for (const message of batch.messages) {
+      const jobId = message.body?.jobId;
+      if (typeof jobId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(jobId)) {
+        message.ack();
+        continue;
+      }
+      let app;
+      try {
+        app = await getApp(env);
+        if (deadLetter) await app.jobs.deadLetter(jobId);
+        else await app.jobs.tick({concurrency: 1, maxJobs: 1, jobIds: [jobId]});
+        message.ack();
+      } catch (error) {
+        console.error(JSON.stringify({component: "queue-consumer", error: error?.name || "processing-failed"}));
+        retry(message);
+      } finally {
+        if (app) await app.db.close().catch(() => {});
+      }
     }
   };
 }

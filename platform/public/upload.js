@@ -6,7 +6,7 @@ async function compatibleSource(file,slug,token){
  if(!['image/heic','image/heif'].includes(file.type))return file;
  const response=await fetch(`/api/guest/${slug}/convert`,{method:'PUT',headers:{'X-Guest-Token':token,'Content-Type':file.type},body:file,signal:AbortSignal.timeout(120000)});
  if(!response.ok){let message='This HEIC photo could not be converted. Try a JPEG copy.';try{message=(await response.json()).error||message;}catch{}throw new Error(message);}
- return new File([await response.blob()],file.name.replace(/\.hei[cf]$/i,'.webp'),{type:'image/webp'});
+ return new File([await response.blob()],file.name.replace(/\.hei[cf]$/i,'.webp'),{type:'image/webp',lastModified:file.lastModified});
 }
 export async function optimize(file,slug,token){
  if(!PHOTO_SOURCE_TYPES.includes(file.type))throw new Error('Choose a JPEG, PNG, WebP, HEIC or HEIF photo.');
@@ -25,7 +25,7 @@ export function photoQueue(slug,guest,host){let queue=[],running=0,disposed=fals
   try{
    if(!q.photo){Object.assign(q,await optimize(q.file,slug,guest.token));q.checksum=await digest(q.photo);q.thumbnail_checksum=await digest(q.thumb);}
    if(q.removed)return;q.status='uploading';q.progress=10;render();
-   const reserved=await api(`/guest/${slug}/reserve`,{method:'POST',headers,body:{id:q.id,name:q.name,bytes:q.photo.size,thumbnail_bytes:q.thumb.size,checksum:q.checksum,thumbnail_checksum:q.thumbnail_checksum}});
+   const reserved=await api(`/guest/${slug}/reserve`,{method:'POST',headers,body:{id:q.id,name:q.name,captured_at:q.file.lastModified,bytes:q.photo.size,thumbnail_bytes:q.thumb.size,checksum:q.checksum,thumbnail_checksum:q.thumbnail_checksum}});
    q.reserved=true;
    if(q.removed)return;
    if(reserved.status!=='uploaded'){

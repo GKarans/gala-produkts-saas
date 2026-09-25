@@ -3,6 +3,7 @@ $secure = $null
 $pointer = [IntPtr]::Zero
 $connectionString = $null
 $exitCode = 1
+  $expectedProjectRef = 'cpweowosocjuccjsyyic'
 
 try {
   $env:PLATFORM_MODE = 'staging'
@@ -38,6 +39,9 @@ try {
   }
   if (-not $projectRef) {
     throw 'Use a Supabase Direct URI, or the Session pooler URI on port 5432. Do not use the project API URL or Transaction pooler (port 6543).'
+  }
+  if ($projectRef -cne $expectedProjectRef) {
+    throw "This script is for the closed-test project '$expectedProjectRef' only. No migration was run."
   }
   Write-Host "Connection targets Supabase project: $projectRef"
   $confirmation = Read-Host "Type ONLY '$projectRef' to confirm (not 'postgres.$projectRef' or the database host)"

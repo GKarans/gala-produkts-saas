@@ -24,6 +24,21 @@ function readLimits(limits) {
   };
 }
 
+function fixedLengthStream(length) {
+  if (typeof globalThis.FixedLengthStream === "function") return new globalThis.FixedLengthStream(length);
+  let bytes = 0;
+  return new TransformStream({
+    transform(chunk, controller) {
+      bytes += chunk.byteLength;
+      if (bytes > length) throw new TypeError("Stream exceeded its declared length.");
+      controller.enqueue(chunk);
+    },
+    flush() {
+      if (bytes !== length) throw new TypeError("Stream did not match its declared length.");
+    }
+  });
+}
+
 export function createR2Storage(bucket, options = {}) {
   if (!bucket || typeof bucket.put !== "function" || typeof bucket.get !== "function") {
     throw new TypeError("An R2 bucket binding is required.");
@@ -67,13 +82,13 @@ export function createR2Storage(bucket, options = {}) {
       await reserve({classA: 1, bytes: bytes.byteLength});
       await bucket.put(validKey(key), bytes, { httpMetadata: { contentType } });
     },
-    async putStream(key, stream, contentType = "application/octet-stream", {maxBytes} = {}) {
+    async putStream(key, stream, contentType = "application/octet-stream", {maxBytes, contentLength} = {}) {
       let body = typeof stream?.getReader === "function" ? stream : Readable.toWeb(stream);
       if (budget) {
-        if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > budget.limits.streamWriteBytes) {
+        if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > budget.limits.streamWriteBytes || !Number.isSafeInteger(contentLength) || contentLength <= 0 || contentLength > maxBytes) {
           throw new Fault(413, "This export exceeds the configured storage safety limit.");
         }
-        await reserve({classA: 1, bytes: maxBytes});
+        await reserve({classA: 1, bytes: contentLength});
         let actualBytes = 0;
         body = body.pipeThrough(new TransformStream({
           transform(chunk, controller) {
@@ -83,13 +98,27 @@ export function createR2Storage(bucket, options = {}) {
           }
         }));
       }
-      await bucket.put(validKey(key), body, { httpMetadata: { contentType } });
+      if (Number.isSafeInteger(contentLength) && contentLength > 0) {
+        const fixed = fixedLengthStream(contentLength);
+        await Promise.all([
+          body.pipeTo(fixed.writable),
+          bucket.put(validKey(key), fixed.readable, { httpMetadata: { contentType } })
+        ]);
+      } else {
+        await bucket.put(validKey(key), body, { httpMetadata: { contentType } });
+      }
     },
     async get(key) {
       await reserve({classB: 1});
       const object = await bucket.get(validKey(key));
       if (!object) throw new Error("R2 object not found.");
       return Buffer.from(await object.arrayBuffer());
+    },
+    async getStream(key) {
+      await reserve({classB: 1});
+      const object = await bucket.get(validKey(key));
+      if (!object) throw new Error("R2 object not found.");
+      return object.body;
     },
     async remove(key) {
       await reserve({classA: 1});

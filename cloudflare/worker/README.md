@@ -16,3 +16,8 @@ Do not deploy a production Worker, replace the current service, change DNS, or
 enable paid resources until every gate in
 [`platform/docs/LAUNCH-GATES.md`](../../platform/docs/LAUNCH-GATES.md) has dated
 evidence and the owner has explicitly approved the production plan.
+
+The eventual domain handoff and rollback procedure is documented in
+[`platform/docs/CLOUDFLARE-CUTOVER.md`](../../platform/docs/CLOUDFLARE-CUTOVER.md).
+It explicitly forbids splitting live traffic between the staging and
+production databases.

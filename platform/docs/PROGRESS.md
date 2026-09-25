@@ -1,6 +1,6 @@
 # Product progress
 
-Updated: 2026-09-13. This checklist concerns only the isolated, uncommitted platform copy.
+Updated: 2026-09-24. This checklist concerns only the isolated, uncommitted platform copy.
 Checked means implemented and verified locally, not approved for public sales.
 The original [roadmap](PRODUCT-ROADMAP.md) is preserved; the full ID mapping is in [ROADMAP-STATUS.md](ROADMAP-STATUS.md).
 
@@ -23,7 +23,7 @@ The original [roadmap](PRODUCT-ROADMAP.md) is preserved; the full ID mapping is 
 - [x] Gallery pagination, thumbnail-only grid, guest/date/order filters and image preview/download.
 - [x] Guest date filtering in the viewer's automatically detected timezone.
 - [x] Opt-in post-event guest gallery, expiry, immediate read-time revocation and atomic event request allowance.
-- [x] Durable all/selected ZIP jobs, complete ID snapshots, manifests, reusable parts and expired-lease recovery.
+- [x] Automatic full-gallery event-end ZIP snapshot, immutable after-end gallery deletions, retry-safe source cleanup, reusable numbered parts and deletion of gallery plus ZIP at photo-retention expiry; expired archive view retains only event name/date/time/retention period. Local tests pass; live Worker scheduling, R2 and scale remain unverified.
 - [x] Metadata-first deletion, retryable object cleanup, stale-upload expiration and thumbnail repair.
 - [x] Cover replacement reserves cleanup before writing, preventing failed attachments becoming untracked files.
 - [x] Trial/paid-plan entitlement enforcement and published-event allowance snapshots.
@@ -55,6 +55,14 @@ The original [roadmap](PRODUCT-ROADMAP.md) is preserved; the full ID mapping is 
 Detailed request checklist: [PRODUCT-REFINEMENT.md](PRODUCT-REFINEMENT.md). Security scope and residual gates: [SECURITY-VERIFICATION.md](SECURITY-VERIFICATION.md).
 
 Current repository-wide priorities: [Critical product audit, 2026-09-17](CRITICAL-AUDIT-2026-09-17.md).
+
+## Proposed design work (not implemented or launch-approved)
+
+- [ ] **QR poster designer v2:** replace the current QR design experience with an in-app canvas. Start each event with a fresh design; offer bundled backgrounds and event-only user uploads; support practical image placement/crop, text and restrained decoration. Keep the event's real QR code as a protected, freshly generated layer so an uploaded old Canva poster cannot silently retain a stale QR. Preserve scan-safe contrast/quiet zone, print/export, mobile usability and event-level isolation. Do not inherit designs between events.
+- [ ] **Guest page appearance editor:** extend organizer controls for the actual guest-facing event page (cover, colors, typography and button styling) with a responsive preview. Keep this distinct from the QR poster canvas and ensure each event has its own settings.
+- [ ] Do not add guest-side photo editing as part of these tasks. The photo-only capture/upload flow stays focused; editing guest photos would be a separate product decision and would add processing, storage and privacy scope.
+
+The Android [PhotoEditor](https://github.com/burhanrashid52/PhotoEditor) is not directly embeddable in Lumiq's browser-based editor. Select a web/canvas approach only when this backlog item is scheduled; this investigation does not authorize adding a dependency or replacing current UI now.
 
 ## Not yet accepted
 
