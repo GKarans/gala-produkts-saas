@@ -1,7 +1,21 @@
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$toolPath = Join-Path $env:LOCALAPPDATA 'Lumiq\postgresql17\bin'
+$toolCandidates = @()
+if ($env:LOCALAPPDATA) {
+  $toolCandidates += Join-Path $env:LOCALAPPDATA 'Lumiq\postgresql17\bin'
+}
+if ($env:USERPROFILE) {
+  $toolCandidates += Join-Path $env:USERPROFILE 'AppData\Local\Lumiq\postgresql17\bin'
+}
+$toolPath = $null
+foreach ($candidate in $toolCandidates) {
+  if ((Test-Path -LiteralPath (Join-Path $candidate 'pg_dump.exe')) -and
+      (Test-Path -LiteralPath (Join-Path $candidate 'pg_restore.exe'))) {
+    $toolPath = $candidate
+    break
+  }
+}
 $backupRoot = Join-Path $env:LOCALAPPDATA 'Lumiq\backups'
 $backupPath = Join-Path $backupRoot ('lumiq-restore-drill-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 $environmentNames = @(
@@ -32,9 +46,9 @@ function Set-MaskedProcessValue {
   }
 }
 
-if (-not (Test-Path -LiteralPath (Join-Path $toolPath 'pg_dump.exe')) -or
-    -not (Test-Path -LiteralPath (Join-Path $toolPath 'pg_restore.exe'))) {
-  throw 'PostgreSQL client tools are missing. Follow the owner verification guide first.'
+if (-not $toolPath) {
+  $checked = if ($toolCandidates.Count) { $toolCandidates -join '; ' } else { 'LOCALAPPDATA and USERPROFILE are unset' }
+  throw "PostgreSQL client tools were not found. Checked: $checked. Expected pg_dump.exe and pg_restore.exe."
 }
 if (Test-Path -LiteralPath $backupPath) {
   throw 'The generated backup path already exists; do not overwrite a previous drill.'
