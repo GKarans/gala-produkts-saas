@@ -1,9 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {EventEmitter} from 'node:events';
-import {assertEmptyAuthUsers,assertEmptyPublicSchema,validateRestoreTarget,waitForChildExit} from '../scripts/restore-safety.mjs';
+import {assertEmptyAuthUsers,assertEmptyPublicSchema,libpqConnectionForCli,validateRestoreTarget,waitForChildExit} from '../scripts/restore-safety.mjs';
 
 const ref='cpweowosocjuccjsyyic';
+
+test('libpq CLI connections keep passwords out of process arguments',()=>{
+ const result=libpqConnectionForCli('postgresql://postgres.project:pa%40ss%3Aword@aws-0-eu-central-1.pooler.supabase.com:5432/postgres?sslmode=require');
+ assert.equal(result.password,'pa@ss:word');
+ assert.equal(result.connectionString,'postgresql://postgres.project@aws-0-eu-central-1.pooler.supabase.com:5432/postgres?sslmode=require');
+ assert.equal(result.connectionString.includes('pa@ss'),false);
+ assert.throws(()=>libpqConnectionForCli('postgresql://postgres@db.example.com:5432/postgres'),/include a host, username and password/);
+});
 
 test('restore target confirmation matches direct and session-pooler Supabase URLs',()=>{
  assert.equal(validateRestoreTarget(`postgresql://postgres.${ref}:secret@aws-0-eu-central-1.pooler.supabase.com:5432/postgres`,ref),ref);

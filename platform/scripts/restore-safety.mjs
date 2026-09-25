@@ -2,6 +2,14 @@ import {once} from 'node:events';
 
 export async function waitForChildExit(child){return (await once(child,'close'))[0]??1;}
 
+export function libpqConnectionForCli(connectionString){
+ let url;try{url=new URL(connectionString);}catch{throw new Error('PostgreSQL connection URL is invalid.');}
+ if(!['postgres:','postgresql:'].includes(url.protocol)||!url.hostname||!url.username||!url.password)throw new Error('PostgreSQL CLI connection must include a host, username and password.');
+ let password;try{password=decodeURIComponent(url.password);}catch{throw new Error('PostgreSQL connection password encoding is invalid.');}
+ url.password='';
+ return{connectionString:url.toString(),password};
+}
+
 export function validateRestoreTarget(databaseUrl, expectedProjectRef){
  if(typeof expectedProjectRef!=='string'||! /^[a-z0-9-]{8,64}$/i.test(expectedProjectRef))throw new Error('Confirm the exact empty drill project reference in PLATFORM_RESTORE_TARGET_REF.');
  let url;try{url=new URL(databaseUrl);}catch{throw new Error('Restore target must be a valid PostgreSQL URL.');}

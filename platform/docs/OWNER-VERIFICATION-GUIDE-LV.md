@@ -152,17 +152,29 @@ Nekad neatjauno esošajā closed-test DB vai bucketā.
    daļējo mapi; ziņo tikai nekonfidenciālo kļūdas tekstu.
 4. Verifierim jāpārbauda database dump, publisko tabulu inventārs un katra
    lokālā R2 objekta kontrolsumma. Saglabā sekmīgi verificētās mapes ceļu.
-5. Izveido jaunu tukšu atjaunošanas DB un atsevišķu tukšu R2 bucket. Pārbaudi
-   to projekta ID neatkarīgi. Nedrīkst būt tie paši target ID kā avotam.
-6. Slēptajā terminālī ievadi tikai jaunā mērķa URL/atslēgas, uzstādi
-   `PLATFORM_RESTORE_TARGET_REF` uz tukšā Supabase projekta ref un
-   `PLATFORM_RESTORE_DRILL=EMPTY-ISOLATED-TARGET`; izpildi
-   `npm run restore:drill -- <sekmīgi-verificētās-backup-mapes-cels>`.
-7. Veiksmes izvadē jābūt sakrītošam publisko tabulu/rindu inventāram un visu R2
+5. Atjaunošanas mērķi jau ir izveidoti un pārbaudīti: Supabase Free projekts
+   `Lumiq Restore Drill 2026-09-25`, ref `sprzlvywzpeyuzbsyplz`, Central EU
+   (Frankfurt); Cloudflare R2 Standard bucket `lumiq-restore-drill-20260925`,
+   EEUR, `0 B`, `Public Access: Disabled`. Avots ir cits projekts
+   (`cpweowosocjuccjsyyic`) un cits buckets (`lumiq-closed-test-photos`).
+6. Cloudflare izveido R2 API tokenu ar `Object Read & Write` atļauju, kas
+   ierobežota tikai uz `lumiq-restore-drill-20260925`. Supabase projekta
+   `Connect` logā izvēlies Session Pooler, portu 5432. Neielīmē tokenu vai
+   savienojuma URL čatā, `.env`, komandrindas argumentos vai Git.
+7. No repozitorija saknes atver PowerShell un palaid
+   `.\platform\scripts\restore-local.ps1`. Palaidējs pēc noklusējuma izvēlas
+   verificēto backupu `%LOCALAPPDATA%\Lumiq\backups\lumiq-restore-drill-20260925-221255`;
+   pirms noslēpumu prasīšanas atkārto backup verifikāciju, prasa precīzu mērķa
+   projekta ref un maskēti paprasa target pooler URL un bucketam piesaistītā
+   tokena atslēgas. Palaidējs neļauj norādīt citu DB projektu vai bucketu, un
+   iztīra procesa noslēpumus beigās. `restore-drill.mjs` vēlreiz pārbauda backup,
+   mērķa DB tukšumu, Auth lietotāju tukšumu un bucket tukšumu pirms rakstīšanas.
+   PostgreSQL parole netiek nodota `pg_restore` komandrindas argumentos.
+8. Veiksmes izvadē jābūt sakrītošam publisko tabulu/rindu inventāram un visu R2
    atslēgu, izmēru, SHA-256 kontrolsummu sakritībai. Pēc tam manuāli izpildi
    migration verifieri, ielādē atjaunoto aplikāciju izolētā kandidātā, pārbaudi
    `/healthz`, login, galeriju un izvelc vismaz vienu atjaunoto ZIP.
-8. Fiksē avota/mērķa ID (bez noslēpumiem), koda versiju, objektu/rindu skaitu,
+9. Fiksē avota/mērķa ID (bez noslēpumiem), koda versiju, objektu/rindu skaitu,
    ZIP manifestu, ilgumu, neatbilstības un veicēju. Tikai tad atzīmē restore
    gate kā izpildītu. Pēc testa iznīcini tikai īpaši šim drill izveidotos
    atjaunošanas resursus.

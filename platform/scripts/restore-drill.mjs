@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
 import { S3Client, PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { assertEmptyAuthUsers, assertEmptyPublicSchema, validateRestoreTarget, waitForChildExit } from './restore-safety.mjs';
+import { assertEmptyAuthUsers, assertEmptyPublicSchema, libpqConnectionForCli, validateRestoreTarget, waitForChildExit } from './restore-safety.mjs';
 import {assertObjectInventory,assertTableInventory} from './restore-verification.mjs';
 
 if (process.env.PLATFORM_RESTORE_DRILL !== 'EMPTY-ISOLATED-TARGET') {
@@ -20,6 +20,8 @@ const bucket = process.env.PLATFORM_R2_BUCKET;
 const endpoint = process.env.PLATFORM_R2_ENDPOINT;
 if (!database || !bucket || !endpoint || !process.env.PLATFORM_R2_ACCESS_KEY_ID || !process.env.PLATFORM_R2_SECRET_ACCESS_KEY) throw new Error('Load the empty restore target credentials.');
 const targetProjectRef=validateRestoreTarget(database, process.env.PLATFORM_RESTORE_TARGET_REF);
+const cliConnection=libpqConnectionForCli(database),cliEnvironment={...process.env,PGPASSWORD:cliConnection.password};
+delete cliEnvironment.PLATFORM_DATABASE_URL;
 
 const root = path.resolve(backupDirectory);
 const scripts = path.dirname(fileURLToPath(import.meta.url));
@@ -57,9 +59,9 @@ const pgRestore = spawn('pg_restore', [
   '--exit-on-error',
   '--no-owner',
   '--dbname',
-  database,
+  cliConnection.connectionString,
   path.join(root, 'database.dump')
-], { stdio: 'inherit', windowsHide: true });
+], { stdio: 'inherit', windowsHide: true, env:cliEnvironment });
 if (await waitForChildExit(pgRestore) !== 0) {
   throw new Error('Database restore failed. Install PostgreSQL client tools and retry.');
 }
@@ -70,9 +72,9 @@ const authRestore = spawn('pg_restore', [
   '--no-owner',
   '--no-acl',
   '--dbname',
-  database,
+  cliConnection.connectionString,
   path.join(root, manifest.database.auth_file)
-], { stdio: 'inherit', windowsHide: true });
+], { stdio: 'inherit', windowsHide: true, env:cliEnvironment });
 if (await waitForChildExit(authRestore) !== 0) {
   throw new Error('Supabase Auth user/identity restore failed.');
 }

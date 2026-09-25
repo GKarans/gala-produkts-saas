@@ -6,7 +6,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import postgres from 'postgres';
 import {S3Client,ListObjectsV2Command,GetObjectCommand} from '@aws-sdk/client-s3';
-import {waitForChildExit} from './restore-safety.mjs';
+import {libpqConnectionForCli,waitForChildExit} from './restore-safety.mjs';
 import {captureTableInventory} from './restore-verification.mjs';
 
 const database=process.env.PLATFORM_DATABASE_URL,bucket=process.env.PLATFORM_R2_BUCKET,endpoint=process.env.PLATFORM_R2_ENDPOINT;
@@ -21,6 +21,8 @@ const stamp=new Date().toISOString().replace(/[:.]/g,'-'),root=path.resolve(proc
 await mkdir(path.join(root,'objects'),{recursive:true});
 
 const dump=path.join(root,'database.dump'),authDump=path.join(root,'auth-users.dump'),sql=postgres(database,{ssl:'require',max:1});
+const cliConnection=libpqConnectionForCli(database),cliEnvironment={...process.env,PGPASSWORD:cliConnection.password};
+delete cliEnvironment.PLATFORM_DATABASE_URL;
 let tableInventory;
 try{
  await sql.begin('isolation level repeatable read, read only',async tx=>{
@@ -28,9 +30,9 @@ try{
   tableInventory=await captureTableInventory(tx);
   const appTables=tableInventory.filter(table=>table.schema==='public');
   if(!appTables.length||appTables.some(table=>!/^[a-z_][a-z0-9_]*$/.test(table.name)))throw new Error('Public schema inventory is empty or contains an unsupported table name.');
-  const publicDump=spawn('pg_dump',['--format=custom','--no-owner',...appTables.flatMap(table=>['--table',`public.${table.name}`]),`--snapshot=${snapshot}`,'--file',dump,database],{stdio:'inherit',windowsHide:true});
+  const publicDump=spawn('pg_dump',['--format=custom','--no-owner',...appTables.flatMap(table=>['--table',`public.${table.name}`]),`--snapshot=${snapshot}`,'--file',dump,cliConnection.connectionString],{stdio:'inherit',windowsHide:true,env:cliEnvironment});
   if(await waitForChildExit(publicDump)!==0)throw new Error('pg_dump failed while exporting Lumiq public schema.');
-  const authUsersDump=spawn('pg_dump',['--format=custom','--data-only','--no-owner','--no-acl','--table=auth.users','--table=auth.identities',`--snapshot=${snapshot}`,'--file',authDump,database],{stdio:'inherit',windowsHide:true});
+  const authUsersDump=spawn('pg_dump',['--format=custom','--data-only','--no-owner','--no-acl','--table=auth.users','--table=auth.identities',`--snapshot=${snapshot}`,'--file',authDump,cliConnection.connectionString],{stdio:'inherit',windowsHide:true,env:cliEnvironment});
   if(await waitForChildExit(authUsersDump)!==0)throw new Error('pg_dump failed while exporting Supabase Auth users and identities.');
  });
 }finally{await sql.end();}
