@@ -12,6 +12,7 @@
   "vars": {
     "PLATFORM_MODE": "staging",
     "PLATFORM_RELEASE_APPROVED": "staging",
+    "PLATFORM_SERVICE_NAME": "lumiq-closed-test",
     "PLATFORM_ORIGIN": "https://lumiq-closed-test.<your-workers-subdomain>.workers.dev",
     "R2_BUDGET_ENABLED": "true",
     "R2_MAX_CLASS_A_OPS_MONTH": "10000",

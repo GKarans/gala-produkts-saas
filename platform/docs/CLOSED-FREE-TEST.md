@@ -278,8 +278,16 @@ has since changed. It is still a closed test, not production approval.
 - The separate closed-test Worker uses only its test Hyperdrive and private
   `lumiq-closed-test-photos` bucket. It remains behind the owner's Cloudflare
   Access policy. The latest read-only Wrangler listing on 2026-09-25 reports
-  version `0d6c9cd2-3d03-44bc-8bb5-a4591bde7fc9` at 100%. Payments remain
+  version `2e644352-2e50-4e3d-8618-e65336323824` at 100%. Payments remain
   disabled. The root `lumiq-cam` Worker is a separate staging deployment.
+- After migration 012 and Worker version `0d6c9cd2-3d03-44bc-8bb5-a4591bde7fc9`,
+  the owner reported `/healthz` as `status: ok`, `database: ready`, and
+  `storage: bound`. The `service: lumiq-cam` value came from a hard-coded
+  handler label, so it did not identify which hostname served the response.
+  The handler now uses the configured service name or request hostname; this
+  diagnostic-only change is deployed as `2e644352-2e50-4e3d-8618-e65336323824`.
+  Recheck its hostname-specific response and the authenticated app before
+  considering post-deploy smoke complete.
 - The owner applied the approved free, account-specific Gathering exception
   in the test database. The authenticated billing page showed `Gathering
   trialing`, `1 / 4` publications used and `3` remaining after the new test

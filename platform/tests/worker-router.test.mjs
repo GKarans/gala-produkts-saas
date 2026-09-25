@@ -32,14 +32,17 @@ test('Worker forwards API requests and reports database health',async()=>{
   db:{query:async sql=>{seen.push(sql);return{rows:[{ready:1}]};},close:async()=>{seen.push('closed');}},
   handle:async request=>{seen.push(new URL(request.url).pathname);return new Response('api response');}
  }));
- const env={PLATFORM_MODE:'staging',PLATFORM_RELEASE_APPROVED:'staging'};
+ const env={PLATFORM_MODE:'staging',PLATFORM_RELEASE_APPROVED:'staging',PLATFORM_SERVICE_NAME:'lumiq-cam'};
  const api=await handler.fetch(new Request('https://lumiq.cam/api/config'),env);
  assert.equal(api.status,200);
  assert.equal(await api.text(),'api response');
  const health=await handler.fetch(new Request('https://lumiq.cam/healthz'),env);
  assert.equal(health.status,200);
  assert.deepEqual(await health.json(),{status:'ok',service:'lumiq-cam',database:'ready',storage:'bound'});
- assert.deepEqual(seen,['/api/config','closed','select 1 as ready','closed']);
+ const testEnv={...env};delete testEnv.PLATFORM_SERVICE_NAME;
+ const testHealth=await handler.fetch(new Request('https://lumiq-closed-test.gkarans-events.workers.dev/healthz'),testEnv);
+ assert.deepEqual(await testHealth.json(),{status:'ok',service:'lumiq-closed-test.gkarans-events.workers.dev',database:'ready',storage:'bound'});
+ assert.deepEqual(seen,['/api/config','closed','select 1 as ready','closed','select 1 as ready','closed']);
 });
 
 test('Worker serves assets and gives a closed 503 when backend setup is unavailable',async()=>{

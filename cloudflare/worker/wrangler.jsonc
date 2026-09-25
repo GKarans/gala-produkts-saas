@@ -17,6 +17,7 @@
   "vars": {
     "PLATFORM_MODE": "staging",
     "PLATFORM_RELEASE_APPROVED": "staging",
+    "PLATFORM_SERVICE_NAME": "lumiq-cam",
     "PLATFORM_ORIGIN": "https://lumiq.cam",
     "PLATFORM_SUPABASE_PROJECT_REF": "mkycfegxlzidaezljutq"
   },

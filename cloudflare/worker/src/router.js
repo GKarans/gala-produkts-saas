@@ -35,16 +35,17 @@ export function createWorkerHandler(getApp) {
         return json({error: "Lumiq is not available."}, 503);
       }
       const url = new URL(request.url);
+      const service = env.PLATFORM_SERVICE_NAME || url.hostname;
 
       if (url.pathname === "/healthz") {
         try {
           return await withApp(getApp, env, async app => {
             await app.db.query("select 1 as ready");
-            return json({status: "ok", service: "lumiq-cam", database: "ready", storage: "bound"});
+            return json({status: "ok", service, database: "ready", storage: "bound"});
           });
         } catch (error) {
           logStartupFailure(error);
-          return json({status: "unavailable", service: "lumiq-cam", database: "unavailable"}, 503);
+          return json({status: "unavailable", service, database: "unavailable"}, 503);
         }
       }
 
