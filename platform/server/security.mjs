@@ -12,7 +12,7 @@ export function confirmedPassword(input){requireThat(typeof input?.password==='s
 export async function passwordHash(password){requireThat(typeof password==='string'&&password.length>=12&&password.length<=128,400,'Use a password with 12 to 128 characters.');const salt=randomBytes(16).toString('hex');return `${salt}:${(await scrypt(password,salt,64)).toString('hex')}`;}
 export async function passwordMatches(password,stored){if(!stored||typeof password!=='string'||password.length>128)return false;const [salt,key]=stored.split(':');const result=await scrypt(password,salt,64);return key?.length===128&&timingSafeEqual(Buffer.from(key,'hex'),result);}
 export function cookies(header=''){return Object.fromEntries((header||'').split(';').filter(x=>x.includes('=')).map(x=>{const i=x.indexOf('=');return[x.slice(0,i).trim(),x.slice(i+1)]}));}
-export function csrf(req,origin){if(['GET','HEAD','OPTIONS'].includes(req.method))return;requireThat(req.headers.get('origin')===origin,403,'This request is not allowed.');}
+export function csrf(req,origins){if(['GET','HEAD','OPTIONS'].includes(req.method))return;const allowed=origins instanceof Set?origins:new Set([origins]);requireThat(allowed.has(req.headers.get('origin')),403,'This request is not allowed.');}
 export function rateLimiter(limit=120,window=60000){const buckets=new Map();return key=>{const now=Date.now();for(const[k,v]of buckets)if(v.until<now)buckets.delete(k);const b=buckets.get(key)||{count:0,until:now+window};buckets.set(key,b);requireThat(++b.count<=limit,429,'Too many attempts. Please wait a minute.');};}
 export function databaseLimiter(db,limit,scope,now=()=>Date.now()){
  return async key=>{

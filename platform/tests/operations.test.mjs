@@ -23,6 +23,19 @@ test('deployment approval matches the explicit environment and keeps production 
  assert.equal(isReleaseApproved(undefined,undefined),false);
 });
 
+test('alternate app hosts require exact allowlisting and keep CSRF origin checks strict',async()=>{
+ const db=await openDatabase({memory:true}),primary='https://lumiq.cam',testHost='https://lumiq-closed-test.gkarans-events.workers.dev';
+ try{
+  const app=await createApp({db,origin:primary,allowedOrigins:[testHost]});
+  assert.equal((await app.handle(new Request(`${testHost}/api/config`))).status,200);
+  const post=(host,requestOrigin)=>app.handle(new Request(`${host}/api/auth/logout`,{method:'POST',headers:{Origin:requestOrigin,'Content-Type':'application/json'},body:'{}'}));
+  assert.equal((await post(testHost,testHost)).status,200);
+  assert.equal((await post(testHost,'https://attacker.example')).status,403);
+  assert.equal((await app.handle(new Request('https://unlisted.example/'))).status,403);
+  await assert.rejects(createApp({origin:primary,allowedOrigins:['https://lumiq.cam/path']}),/Configured origin is invalid/);
+ }finally{await db.close();}
+});
+
 test('event JSONB values returned as strings are normalized before use',()=>{
  const event=normalizeEvent({appearance:'{"cover":"/api/covers/id","title":"Saved"}',entitlement:'{"retentionDays":14}'});
  assert.deepEqual(event.appearance,{cover:'/api/covers/id',title:'Saved'});

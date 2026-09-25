@@ -45,6 +45,7 @@ async function getApp(env) {
     }
     return await createApp({
       origin: env.PLATFORM_ORIGIN,
+      allowedOrigins: (env.PLATFORM_ALLOWED_ORIGINS || "").split(",").map(origin => origin.trim()).filter(Boolean),
       local: false,
       db,
       files: createR2Storage(env.R2_PHOTOS, budgetEnabled ? {
