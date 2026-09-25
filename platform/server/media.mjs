@@ -15,6 +15,19 @@ export function mediaService(db,files,events,validateImage=async bytes=>{const s
  const ready=async id=>{const m=(await db.query('select * from media where id=$1',[id])).rows[0];requireThat(m,404,'Photo not found.');return m;};
  return {
   ready,
+  async readyWithEvent(id){
+   const row=(await db.query(`
+    select m.*,e.owner_id as asset_event_owner_id,e.status as asset_event_status,
+     e.starts_at as asset_event_starts_at,e.ends_at as asset_event_ends_at,
+     e.paused as asset_event_paused,e.retention_at as asset_event_retention_at,
+     e.share_enabled as asset_event_share_enabled,e.share_expires as asset_event_share_expires
+    from media m join events e on e.id=m.event_id
+    where m.id=$1 and e.status<>'deleted' and e.retention_at>now()
+   `,[id])).rows[0];
+   requireThat(row,404,'Photo unavailable.');
+   const event={id:row.event_id,owner_id:row.asset_event_owner_id,status:row.asset_event_status,starts_at:row.asset_event_starts_at,ends_at:row.asset_event_ends_at,paused:row.asset_event_paused,retention_at:row.asset_event_retention_at,share_enabled:row.asset_event_share_enabled,share_expires:row.asset_event_share_expires};
+   return{media:row,event};
+  },
   async discard(e,g,id){return db.transaction(async tx=>{const m=(await tx.query("update media set status='deleted',deleted_at=now() where id=$1 and event_id=$2 and guest_id=$3 and status='pending' returning id",[id,e.id,g.id])).rows[0];if(m)await tx.query("insert into jobs(id,owner_id,event_id,type,payload,available_at) values($1,$2,$3,'media-cleanup',$4,now()+interval '6 minutes')",[uuid(),e.owner_id,e.id,{ids:[id]}]);return{ok:true};});},
   async reserve(e,g,input){
    requireThat(eventState(e)==='live',409,'This event is closed for uploads.');
