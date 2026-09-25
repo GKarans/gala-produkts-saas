@@ -52,6 +52,29 @@ atsevišķus ceļus; šim slēgtajam pilotam jāizvēlas viss hostname:
 [Application paths](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/app-paths/),
 [self-hosted public app](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/).
 
+## 0.1 Pārbaude pēc testa migrācijas 012
+
+Migrācija `012-tier-photo-capacity` un jaunā testa Worker versija
+`2e644352-2e50-4e3d-8618-e65336323824` ir izvietota tikai slēgtajā testā.
+Pārbaudi to savā jau autentificētajā Cloudflare Access pārlūka sesijā:
+
+1. Atver tieši
+   `https://lumiq-closed-test.gkarans-events.workers.dev/healthz`.
+2. Sagaidi JSON ar `status: ok`,
+   `service: lumiq-closed-test.gkarans-events.workers.dev`,
+   `database: ready` un `storage: bound`. `service` laukam jānosauc testa
+   hostname, nevis `lumiq.cam`.
+3. Atver `https://lumiq-closed-test.gkarans-events.workers.dev/app`, pieslēdzies
+   un pārliecinies, ka organizatora lietotne un pasākumu saraksts ielādējas.
+   Atver testa pasākumu tikai apskatei; šajā pārbaudē neko nedzēs un
+   neaugšupielādē.
+4. Pieraksti laiku, Worker versiju un četrus JSON laukus. Nesūti Access
+   tokenus, sīkdatnes vai paroles.
+
+Ja URL aizved uz `lumiq.cam`, servisa nosaukums nav testa hostname vai kāds
+no `ready` laukiem trūkst, apstājies un atzīmē pārbaudi kā neizdevušos.
+`lumiq.cam` nav daļa no šīs testa darbības.
+
 ## 1. Autentifikācija testa vidē
 
 Sagatavo atsevišķu testa e-pasta adresi, kurai vari piekļūt. Nemaini vienīgo
