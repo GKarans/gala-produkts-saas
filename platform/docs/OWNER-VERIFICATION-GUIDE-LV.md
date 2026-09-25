@@ -10,11 +10,12 @@ neievieto čatā, ekrānattēlos vai Git.
 - Apmaksātus produkcijas resursus neveido un nepieslēdz, kamēr `lumiq.cam` nav
   pārslēgts un uzņēmums nav reģistrēts. Tas ir atlikts lēmums, nevis atļauja
   izmantot testa DB/R2 publiskai produkcijai.
-- Ja `lumiq.cam` vispirms pārslēdz slēgtam pilotam, tam jāpaliek aiz Cloudflare
-  Access, jāraksta tikai atsevišķajā closed-test DB/R2, un jābūt aizliegtām
-  publiskai reģistrācijai, pārdošanai un īstu viesu foto pieņemšanai. Tas nav
-  production launch. Pirms šādas domēna maiņas vēl jāizveido un jāpārbauda
-  Access politika, test Auth atgriešanās URL un atsevišķa kandidāta Worker.
+- `lumiq.cam` jau ir pārslēgts uz slēgtā testa Worker aiz Cloudflare Access;
+  tam jāraksta tikai atsevišķajā closed-test DB/R2. Publiska reģistrācija,
+  pārdošana un viesu foto pieņemšana nav atļauta. Tas nav production launch.
+  Tet Drošība pašlaik rāda `Malware` bloķēšanas lapu; kamēr Tet nav izvērtējis
+  domēnu un parastā TLS pārbaude neizdodas, brīdinājumu neapiet un paroles
+  neievadi.
 - Pēc uzņēmuma reģistrācijas atgriezies pie `PRODUCTION-COST-PLAN.md`, saņem
   konkrēto ikmēneša izmaksu apstiprinājumu un tikai tad veido izolētos
   production DB/R2/Queue resursus. `lumiq.cam` nedrīkst sūtīt klientus uz
@@ -23,65 +24,62 @@ neievieto čatā, ekrānattēlos vai Git.
   dzēšanas/glabāšanas politika un galīgās cenas paliek atliktas līdz uzņēmuma
   reģistrācijai un kvalificētai juridiskai/nodokļu konsultācijai.
 
-## 0. Access pārbaude saknes domēna pārejai
+## 0. Slēgtā domēna Access pašreizējais stāvoklis
 
-Pašreiz `lumiq.cam/app` atdod publisku lietotnes čaulu, lai gan anonīmais
-`/api/events` atgriež 401. Tas nav slēgta pilota Access apliecinājums. **Neveic
-šos soļus ārpus apstiprināta domēna pārejas loga**, jo Access aplikācija uz
-saknes domēna tūlīt ietekmēs pašreizējo `lumiq.cam` vietni.
+Cutover ir veikts: `lumiq.cam` piesaistīts `lumiq-closed-test` Worker un visu
+hostname sargā Cloudflare Access. Allow sarakstā ir tikai īpašnieka e-pasts;
+bez konfigurēta ārēja identitātes nodrošinātāja Access izmanto vienreizēju
+e-pasta PIN. Anonīmi pieprasījumi uz sakni, `/app`, API, `/healthz`, Auth
+atgriešanās ceļiem un sintētisku viesa URL ir saņēmuši Access `302`. Tas
+apliecina anonīmās robežas pārbaudi, nevis autentificētu aplikācijas/Auth
+plūsmu.
 
-1. Ieplānotajā pārejas logā Cloudflare Zero Trust atver **Access controls →
-   Applications → Create new application → Self-hosted**.
-2. Pievieno visu `lumiq.cam` hostname kā vienu app (ne tikai `/app` vai `/api`)
-   un Allow politikā atstāj tikai īpašnieku un nosauktos testētājus. Neveido
-   `Bypass` vai publisku Allow politiku.
-3. Pārlūkā bez Access sesijas pārbaudi `/`, `/app`, `/features`, `/api/config`,
-   `/api/events`, `/healthz`, `/auth/verify`, `/auth/reset`, `/auth/email`,
-   `/api/auth/google/callback` un vienu sintētiska pasākuma viesu URL. Visām
-   takām jāapstājas pie Access login/deny; neviena nedrīkst atdot lietotnes
-   saturu, API datus vai Worker veselības atbildi.
-4. Atļautā testa sesijā atver organizatora lietotni un viesa URL; statiskajiem
-   failiem un API pieprasījumiem jāstrādā, un Supabase Auth atgriešanās saitēm
-   jāsaglabā pareizais ceļš pēc Access autentifikācijas.
-5. Pārbaudi Access audit žurnālus, saglabā nekonfidenciālus statusus un tikai
-   pēc tam turpini ar Worker hostname piesaistes nomaiņu. Ja kāds ceļš apiet
-   Access vai testētājs nevar atgriezties pēc login, apturi cutover.
+1. Vispirms jāatrisina Tet Drošība brīdinājums sadaļā 6. Kamēr Tet to nav
+   izvērtējis, nedodam piekļuvi testētājiem un neievadām Access PIN caur
+   bloķēto savienojumu.
+2. Pēc Tet atbildes un parastās TLS pārbaudes iziešanas īpašnieks atver
+   `https://lumiq.cam/healthz`, autentificējas Access un pārbauda, ka JSON
+   rāda `status: ok`, `service: lumiq-closed-test.gkarans-events.workers.dev`,
+   `database: ready` un `storage: bound`.
+3. Atver `https://lumiq.cam/app`, pārbauda īpašnieka pieteikšanos un
+   organizatora paneli. Pārbauda, ka pieteikšanās/sesijas darbības nenonāk uz
+   staging Worker un ka Supabase saites atgriežas uz `lumiq.cam`.
+4. Visa hostname Access politika aiztur arī viesu saites, tāpēc šajā stāvoklī
+   publiska viesa QR/augšupielādes plūsma nav testējama. Neveido `Bypass` vai
+   publisku Access politiku. Viesa scenārijam vispirms jāizplāno atsevišķs
+   izolēts, īslaicīgs testa hostname/piekļuves režīms ar tikai sintētiskiem
+   foto un jāpārbauda, ka organizatora/admin API paliek slēgti.
+5. Saglabā datumu, Worker versiju un nekonfidenciālos JSON/statusus. Nefiksē
+   PIN, sīkdatnes, tokenus vai Access pāradresācijas pilno URL.
 
 Cloudflare ļauj self-hosted Access aplikācijai aizsargāt visu hostname, kā arī
 atsevišķus ceļus; šim slēgtajam pilotam jāizvēlas viss hostname:
 [Application paths](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/app-paths/),
 [self-hosted public app](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/).
 
-## 0.1 Pārbaude pēc testa migrācijas 012
+## 0.1 Testa DB un R2 veselības pārbaude
 
-Migrācija `012-tier-photo-capacity` un jaunā testa Worker versija
-`2e644352-2e50-4e3d-8618-e65336323824` ir izvietota tikai slēgtajā testā.
-Pārbaudi to savā jau autentificētajā Cloudflare Access pārlūka sesijā:
+Testa DB migrācijas 001–012 ir lietotas slēgtajam testam. Jauna testa
+izvietošana 2026-09-25: `lumiq-closed-test` versija
+`18339063-de58-4c3b-9dae-051b254a89d6`; `lumiq.cam` pašlaik ir šī Worker
+slēgtā alias. Vispirms jāiziet sadaļas 6 Tet pārbaude, tikai pēc tam:
 
-1. Atver tieši
-   `https://lumiq-closed-test.gkarans-events.workers.dev/healthz`.
-2. Sagaidi JSON ar `status: ok`,
-   `service: lumiq-closed-test.gkarans-events.workers.dev`,
-   `database: ready` un `storage: bound`. `service` laukam jānosauc testa
-   hostname, nevis `lumiq.cam`.
-3. Atver `https://lumiq-closed-test.gkarans-events.workers.dev/app`, pieslēdzies
-   un pārliecinies, ka organizatora lietotne un pasākumu saraksts ielādējas.
-   Atver testa pasākumu tikai apskatei; šajā pārbaudē neko nedzēs un
-   neaugšupielādē.
-4. Pieraksti laiku, Worker versiju un četrus JSON laukus. Nesūti Access
-   tokenus, sīkdatnes vai paroles.
-
-Ja URL aizved uz `lumiq.cam`, servisa nosaukums nav testa hostname vai kāds
-no `ready` laukiem trūkst, apstājies un atzīmē pārbaudi kā neizdevušos.
-`lumiq.cam` nav daļa no šīs testa darbības.
+1. Atver `https://lumiq.cam/healthz` caur Access.
+2. Sagaidi `status: ok`, `database: ready` un `storage: bound`. `service` var
+   būt test Worker identifikators. Ja tiek prasīts Access PIN, ievadi to tikai
+   pēc tam, kad parastais DNS un TLS ir izturējis sadaļas 6 pārbaudes.
+3. Atver `/app` un pārbaudi īpašnieka dashboard. Nekādas staging vai produkcijas
+   datubāzes/objektu izmaiņas šajā pārbaudē neveic.
 
 ## 1. Autentifikācija testa vidē
 
 Sagatavo atsevišķu testa e-pasta adresi, kurai vari piekļūt. Nemaini vienīgo
 īpašnieka konta paroli, ja neesi gatavs pēc tam pieteikties ar jauno paroli.
 
-1. Atver closed-test lietotni caur Access. Reģistrē testa kontu, atver
-   apstiprinājuma e-pastu un seko saitei.
+1. Šobrīd Access atļauj tikai īpašnieka e-pastu. Reģistrācijas testu citam
+   kontam neveic, kamēr tā adrese nav īpaši pievienota Access allowlist un
+   īpašnieks nav apstiprinājis šo pagaidu piekļuvi. Vispirms pārbaudi esošā
+   īpašnieka login/session plūsmu caur `lumiq.cam` pēc DNS/TLS atbloķēšanas.
 2. Pārbaudi, ka atgriežas uz paredzēto Lumiq lapu, konts ir verificēts un var
    atvērt organizatora lietotni.
 3. Izraksties, piesakies atkārtoti, aizver/atver pārlūku un pārbaudi sesiju.
@@ -191,55 +189,54 @@ modeli, OS, pārlūka versiju, datumu un tīklu.
 5. Saglabā nekonfidenciālus ekrānattēlus un pieraksti kļūdas; nelieto īstus
    viesu foto.
 
-## 6. Windows DNS/TLS kļūdas novēršana
+## 6. Tet Drošība DNS/TLS brīdinājuma atrisināšana
 
-Pēdējā pārbaude 2026-09-25: publiskais Cloudflare DNS atgrieza
-`104.21.67.110` un `172.67.221.99`, bet šī datora noklusētais DNS atgrieza
-`81.198.92.113` (TTL 1). Iepriekšējā pārbaudē lokālais DNS bija
-`192.168.1.254`, un parastais `curl` noraidīja sertifikātu ar
-`SEC_E_UNTRUSTED_ROOT`. Atkārto testu ar aktuālajām atbildēm; nepaļaujies uz
-agrāko resolver adresi vai uz vienu fiksētu Cloudflare IP.
-Sertifikātu pārbaudi neizslēdz, neinstalē nepazīstamu saknes sertifikātu un
-neveido hosts faila ierakstu.
+Pārbaude 2026-09-25: parastais datora DNS atgrieza `195.122.12.177` (Tet
+tīkla adrese), un pārlūks parādīja Tet Drošība lapu ar draudu kategoriju
+`Malware`. Parastais TLS pieprasījums uz šo atbildi neizturēja sertifikāta
+pārbaudi (`SEC_E_UNTRUSTED_ROOT`). Neatkarīgi DNS vaicājumi `1.1.1.1` un
+`8.8.8.8` atgrieza Cloudflare IP `104.21.67.110` un `172.67.221.99`; TLS
+pieprasījums, kas piesaistīts Cloudflare malai ar normālu sertifikāta
+pārbaudi, saņēma paredzēto Access `302`. Tas apstiprina DNS atšķirību un
+Cloudflare atbildi, bet **neapliecina domēna pilnu drošumu**.
 
-1. Atver PowerShell un salīdzini datora DNS atbildi ar Cloudflare publisko DNS:
+Tet apraksta Tīkla vairogu kā DNS līmeņa filtru, kas bloķē draudu sarakstos
+esošus resursus un rāda STOP lapu; pašapkalpošanās pārvaldībā ir atļautais
+saraksts. Atļautā saraksta izmantošana tikai apiet bloķējumu šim tīklam, tā
+nav draudu klasifikācijas pārbaude vai drošības apliecinājums. Skatīt [Tet
+Tīkla vairogs](https://www.tet.lv/biznesam/internets/tikla-vairogs).
+
+1. Neievadi Access PIN, paroles vai konta datus STOP lapā. Neizvēlies tās
+   turpināšanas iespēju un nepievieno `lumiq.cam` atļautajam sarakstam kā
+   risinājumu.
+2. Sazinies ar Tet, izmantojot **Mans Tet** atbalstu vai [Tet kontaktu
+   lapu](https://www.tet.lv/par-mums/kontakti). Nosūti domēnu `lumiq.cam`,
+   STOP lapas ekrānattēlu, brīdinājuma datumu/laiku, draudu kategoriju
+   `Malware` un faktu, ka noklusētais resolver atgrieza `195.122.12.177`, bet
+   publiskie resolveri atgrieza Cloudflare IP. Lūdz pārbaudīt klasifikāciju un
+   apstiprināt, kad bloķējums ir noņemts. Nesūti autentifikācijas saites,
+   PIN, paroles vai signed URL.
+3. Saglabā Tet atbildi un incidenta/references numuru. Kamēr nav atbildes,
+   izmanto slēgto testa `workers.dev` hostname tikai caur tā Access aizsardzību;
+   produkta lietotājiem un viesiem `lumiq.cam` nedod.
+4. Pēc Tet apstiprinājuma PowerShell salīdzini parasto DNS ar neatkarīgu
+   publisku atbildi:
 
    ```powershell
    Resolve-DnsName lumiq.cam -Type A
    Resolve-DnsName lumiq.cam -Type A -Server 1.1.1.1
-   ipconfig /all
-   ```
-
-   `ipconfig /all` atrod Wi-Fi adaptera `DNS Servers`. Saglabā rezultātus.
-   Publisko Cloudflare IP vērtības var mainīties; salīdzini, vai lokālā un
-   publiskā atbilde nāk no tās pašas paredzētās Cloudflare zonas, nevis
-   paļaujies uz vienu mūžīgi fiksētu IP.
-2. Notīri tikai Windows DNS kešu un pārbaudi vēlreiz:
-
-   ```powershell
    ipconfig /flushdns
    Resolve-DnsName lumiq.cam -Type A
-   curl.exe --fail --show-error https://lumiq.cam/healthz
+   curl.exe --fail --show-error -D - https://lumiq.cam/healthz
    ```
 
-   Paredzēts: parastais `curl` pabeidzas ar HTTP 200, TLS bez brīdinājuma un
-   JSON ar `database: ready` un `storage: bound`. `ipconfig /flushdns` notīra
-   klienta resolver kešu; tas pats par sevi neizlabo maršrutētāja DNS atbildi.
-3. Ja lokālais DNS joprojām atšķiras, vispirms pārstartē pārlūku un maršrutētāju
-   tikai tad, ja tas ir droši mājas tīklam. Maršrutētāja iestatījumos pārbaudi
-   DNS proxy/forwarder, cache, vecās manuālās DNS vērtības, parental-control vai
-   filtrēšanas funkciju. Ja neesi drošs par maršrutētāja izmaiņām, tās neveic.
-4. Kā īslaicīgu, atgriezenisku pārbaudi Windows 11 iestati DNS tikai šim
-   datoram: **Settings → Network & internet → Wi-Fi → Hardware properties →
-   DNS server assignment → Edit → Manual → IPv4**; Preferred `1.1.1.1`,
-   Alternate `1.0.0.1`; saglabā, atvieno/pieslēdz Wi-Fi un izpildi `ipconfig
-   /flushdns`. Windows ekrānu nosaukumi var atšķirties. Lai atgrieztos,
-   tajā pašā vietā izvēlies **Automatic (DHCP)**. Ja lieto ģimenes/uzņēmuma DNS
-   filtrēšanu, neizslēdz to bez atļaujas.
-5. Atkārto `Resolve-DnsName` un parasto `curl.exe` bez `--resolve`. Ja TLS kļūda
-   paliek, pieraksti DNS serveru atbildes, sertifikāta kļūdu un tīklu; sazinies
-   ar interneta pakalpojuma sniedzēju vai tīkla administratoru. Nekad
-   neizmanto `curl -k` / `--insecure`.
+   A ierakstiem jāatbilst Cloudflare zonai, TLS jāpārbauda bez brīdinājuma,
+   un HTTP jābūt Access izaicinājumam, nevis publiskai `healthz` atbildei.
+   Tikai pēc tam Access PIN ievadi `lumiq.cam` pārlūkā un pabeidz sadaļu 0.
+5. Ja parastais DNS joprojām ved uz `195.122.12.177` vai TLS kļūda paliek,
+   atgriezies pie Tet ar rezultātiem un apstājies. Nemaini DNS iestatījumus,
+   nerediģē hosts failu, neinstalē sertifikātus, neizmanto `--resolve` ikdienas
+   pārlūkošanai un nekad nelieto `curl -k` / `--insecure`.
 
 Microsoft apraksta Windows DNS klienta keša pārbaudi un `ipconfig /flushdns`
 [DNS troubleshooting](https://learn.microsoft.com/windows-server/networking/dns/troubleshoot/troubleshoot-dns-client)

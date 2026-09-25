@@ -1,13 +1,21 @@
 # Cloudflare Production Cutover
 
-Status: procedure only. Production resources and public-domain changes are not
-approved or provisioned. This is not a deployment instruction for today.
+Status: `lumiq.cam` was owner-approved and moved to the closed-test Worker on
+2026-09-25 as an Access-gated development pilot, not production. The active
+candidate is `lumiq-closed-test` version
+`18339063-de58-4c3b-9dae-051b254a89d6`, isolated to test resources. Normal
+access from the owner's Tet network is currently blocked by a `Malware`
+warning and mismatched DNS/TLS; do not bypass it. Production resources and a
+public-production cutover remain unapproved/unprovisioned. This file's
+remaining cutover procedure applies to the future production launch.
 
 ## Non-negotiable boundary
 
-The active `lumiq-cam` Worker and `lumiq.cam` currently use staging resources.
+The active `lumiq.cam` hostname currently reaches the closed-test Worker behind
+Cloudflare Access. The old staging Worker `lumiq-cam` remains deployed without
+the `lumiq.cam` custom domain; its staging DB, bucket and data remain intact.
 Do not use the checked-in `cloudflare/worker/wrangler.jsonc` to deploy new
-code: it targets that live staging Worker and its data. Keep production
+code: it targets the old staging Worker and its data. Keep production
 resources in a separate, owner-controlled configuration and secret set.
 
 Cloudflare Worker versions include code, assets, bindings and compatibility
@@ -24,12 +32,12 @@ The owner has deferred paid production resources until after `lumiq.cam` has
 transitioned and the company is registered. Treat these as separate
 milestones, not permission to expose the current staging-backed Worker publicly:
 
-1. A pre-company domain transition, if separately approved, is only a closed
-   pilot. It must use isolated test resources, synthetic data, disabled public
-   registration/payments, and a verified Cloudflare Access allowlist. Test the
-   Access gate in a private browser session before moving the hostname. If
-   Access cannot be proven to cover every route and asset, do not point the
-   domain at the candidate; continue on the existing closed-test hostname.
+1. The owner-approved pre-company transition has been completed as a closed
+   pilot on isolated test resources behind an allowlisted Cloudflare Access
+   policy. Anonymous requests pinned to a Cloudflare edge address receive an
+   Access challenge, but authenticated app/Auth flow and normal-network access
+   are not yet verified. A Tet security warning currently blocks the owner's
+   normal DNS path; keep the service closed and do not bypass that warning.
 2. After company registration and a fresh cost review explicitly approved by
    the owner, provision separate paid production resources and complete every
    production gate below before opening the service to customers.
@@ -80,9 +88,10 @@ approval. In addition:
    `PLATFORM_SUPABASE_PROJECT_REF` to the project verified from the production
    Hyperdrive origin; it must match the Supabase Auth URL. No wildcard auth
    redirects.
-7. Record the current `lumiq-cam` version, staging resource IDs, domain/TLS
-   state, and the chosen no-staging rollback/maintenance response. Do not
-   proceed if the response would expose staging data to production users.
+7. Record the current production-candidate version, the closed-test Worker
+   version, the detached `lumiq-cam` staging version/resource IDs, domain/TLS
+   state, and a rollback/maintenance response that never exposes test or
+   staging data to production users.
 
 ## Cutover window
 
@@ -97,10 +106,11 @@ checks the evidence. Warn testers that the site may briefly be unavailable.
 3. Set Supabase Site URL and exact allowed redirects to `https://lumiq.cam`.
    Set the candidate's canonical origin to `https://lumiq.cam`. Do not send
    auth emails during the interval while the root domain still reaches staging.
-4. Remove the existing `lumiq.cam` Custom Domain association from the staging
-   Worker, then attach the domain to the already-tested production candidate in
-   Cloudflare. Do not change Namecheap nameservers or add guessed DNS records;
-   Cloudflare Custom Domains manages its DNS record and certificate.
+4. Remove the existing `lumiq.cam` Custom Domain association from the
+   closed-test Worker, then attach the domain to the already-tested production
+   candidate in Cloudflare. The old staging Worker is already detached. Do not
+   change Namecheap nameservers or add guessed DNS records; Cloudflare Custom
+   Domains manages its DNS record and certificate.
 5. Confirm the production Worker is the sole owner of `lumiq.cam`, TLS validates
    without bypasses, and production `GET /healthz` reports the expected ready
    state. Confirm the closed-test hostname remains Access-protected.
@@ -116,11 +126,13 @@ checks the evidence. Warn testers that the site may briefly be unavailable.
 
 ### Before any real customer writes
 
-If the smoke test fails, stop new writes. The pre-cutover `lumiq-cam` version
-may be restored to the domain only while the app is still a closed test and no
-production customer data has been accepted. The production DB/R2 remain intact;
-do not copy them into staging. Correct the candidate and repeat all failed
-checks before another cutover.
+If the smoke test fails, stop new writes and contain the hostname with Access
+or maintenance mode. Do not restore the old `lumiq-cam` version: it is bound to
+staging data. Before any production customer data exists, the closed-test
+version may be restored only as a clearly labeled closed test, with Access
+enabled and the test DB/R2 bindings verified. Never copy production data into
+test or staging. Correct the candidate and repeat all failed checks before
+another cutover.
 
 ### After production data exists
 
