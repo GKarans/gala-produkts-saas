@@ -270,6 +270,11 @@ has since changed. It is still a closed test, not production approval.
   test Hyperdrive were provisioned and checked. No MVP migration or production
   migration was run. The test project reference is pinned in the migration
   guard; database credentials must never be copied into this repo.
+- The current source adds migration `012-tier-photo-capacity` and raises the
+  per-event byte allowances to 100 / 1000 / 1000 / 2000 MiB. Migration 012 is
+  not yet applied to the closed-test database and this source is not deployed;
+  apply the guarded test migration before deploying it, since Worker startup
+  requires every manifest version. Production remains untouched.
 - The separate closed-test Worker uses only its test Hyperdrive and private
   `lumiq-closed-test-photos` bucket. It remains behind the owner's Cloudflare
   Access policy. The latest read-only Wrangler listing on 2026-09-25 reports

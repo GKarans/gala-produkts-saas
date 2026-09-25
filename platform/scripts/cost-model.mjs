@@ -1,4 +1,14 @@
 import {PLANS} from '../shared/plans.js';
-const subscribers=Number(process.argv[2]||100),mix={single:.2,gathering:.6,studio:.2},utilization=Number(process.argv[3]||.55),avgPairMiB=1.08,r2GbMonth=0.015,stripePercent=.015,stripeFixed=.25;
-let revenue=0,events=0,photos=0,retainedPhotoMonths=0,fees=0;for(const [id,share]of Object.entries(mix)){const plan=PLANS[id],accounts=subscribers*share,transactions=accounts;revenue+=accounts*plan.price/100;const planEvents=accounts*plan.events*utilization,planPhotos=planEvents*plan.photos;events+=planEvents;photos+=planPhotos;retainedPhotoMonths+=planPhotos*Math.max(1,plan.retentionDays/30);fees+=transactions*(plan.price/100*stripePercent+stripeFixed);}
-const gb=retainedPhotoMonths*avgPairMiB/1024,storage=gb*r2GbMonth,margin=revenue-fees-storage;console.log(JSON.stringify({assumptions:{subscribers,mix,utilization,avgPairMiB,r2GbMonth,stripePercent,stripeFixed,note:'Single users buy one event per modeled month; hosting, support, tax, email and operations are excluded.'},monthly:{revenue:+revenue.toFixed(2),events:+events.toFixed(1),newPhotos:Math.round(photos),retainedGB:+gb.toFixed(1),storage:+storage.toFixed(2),paymentFees:+fees.toFixed(2),marginBeforeTaxHostingSupport:+margin.toFixed(2)}},null,2));
+import {estimateCosts} from '../shared/cost-model.js';
+
+const [, , subscribersArg, utilizationArg, averagePairArg, viewsArg, emailArg] = process.argv;
+const result = estimateCosts({
+  plans: PLANS,
+  subscribers: Number(subscribersArg || 100),
+  eventUtilization: Number(utilizationArg || 0.55),
+  averagePhotoPairMiB: Number(averagePairArg || 1.08),
+  fullSizeViewsPerPhoto: Number(viewsArg || 100),
+  emailUsd: Number(emailArg || 0),
+});
+
+console.log(JSON.stringify(result, null, 2));

@@ -4,12 +4,12 @@ Prices and allowances are a local product configuration; no live billing price i
 
 | Plan | Price | New publications | Photos/event | Storage/event | Event duration | Photo retention | Guest sharing |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| Explore | Free trial | 1 | 50 | 30 MiB | 1 day / 24 hours | 7 days | Up to 4 days |
-| Single Event | EUR 15 once | 1 pass | 500 | 200 MiB | Up to 3 days | 14 days | Up to 7 days |
-| Gathering | EUR 30/month | 4 per paid period | 500 | 200 MiB | Up to 3 days | 14 days | Up to 7 days |
-| Studio | EUR 70/month | 12 per paid period | 1000 | 400 MiB | Up to 3 days | 30 days | Up to 14 days |
+| Explore | Free trial | 1 | 50 | 100 MiB | 1 day / 24 hours | 7 days | Up to 4 days |
+| Single Event | EUR 15 once | 1 pass | 500 | 1000 MiB | Up to 3 days | 14 days | Up to 7 days |
+| Gathering | EUR 30/month | 4 per paid period | 500 | 1000 MiB | Up to 3 days | 14 days | Up to 7 days |
+| Studio | EUR 70/month | 12 per paid period | 1000 | 2000 MiB | Up to 3 days | 30 days | Up to 14 days |
 
-The photo-count cap and total stored-byte cap are enforced independently. Stored bytes include the optimized WebP photo and its thumbnail, not the phone original. Explore allows 50 photos / 30 MiB (0.6 MiB per photo pair on average); Single Event and Gathering allow 500 / 200 MiB (0.4 MiB per pair); Studio allows 1,000 / 400 MiB (0.4 MiB per pair). These are arithmetic averages, not promises about actual file size or quality. Complex scenes may be larger, and the byte cap can be reached before the photo-count cap. At the configured per-file maxima (6 MiB photo + 1 MiB thumbnail), the byte caps can hold fewer photos than the count caps; actual optimized files vary, so the product must not promise a fixed average size per photo.
+The photo-count cap and total stored-byte cap are enforced independently. Stored bytes include the optimized WebP photo and its thumbnail, not the phone original. Every tier now budgets 2 MiB per photo pair: Explore 50 / 100 MiB; Single Event and Gathering 500 / 1000 MiB; Studio 1,000 / 2000 MiB. This is room for typical optimized high-resolution photos, not a promise about actual file sizes or quality. Larger complex photos can use more; because originals may be up to 6 MiB and thumbnails up to 1 MiB, an event can still reach its byte cap before the photo-count cap.
 
 The first publication consumes a plan slot, including a future scheduled event; drafts do not. Archiving/deleting does not return a slot and monthly slots do not roll over. Single Event purchases remain separate from subscriptions.
 

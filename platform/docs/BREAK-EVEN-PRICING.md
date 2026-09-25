@@ -15,8 +15,9 @@ not included.
 | Gathering | EUR 30/month | 4 per paid period |
 | Studio | EUR 70/month | 12 per paid period |
 
-The data model caps each Gathering event at 500 photos / 200 MiB and each
-Studio event at 1,000 photos / 400 MiB. Event photo pairs include thumbnails;
+The data model caps each Explore event at 50 photos / 100 MiB, Single Event and
+Gathering at 500 / 1000 MiB, and Studio at 1,000 / 2000 MiB. Each tier budgets
+2 MiB per photo pair. Event photo pairs include thumbnails;
 the post-event ZIP is an additional copy of originals and stays until retention
 expires. Limits are separate count and byte ceilings.
 
@@ -57,54 +58,53 @@ Live vendor price pages: [Workers](https://developers.cloudflare.com/workers/pla
 [Stripe Latvia](https://stripe.com/en-lv/pricing/local-payment-methods),
 [ECB reference rate](https://www.ecb.europa.eu/stats/shared/pdf/eurofxref.pdf).
 
-## Conservative usage scenario
+## High-usage scenario
 
-For comparison, each account is at full publication/photo/byte limits. Each
-stored photo is viewed 100 times at full size. The Worker estimate uses 7 ms
-CPU per served image, matching Cloudflare's published pricing example; this
-must be replaced with measurements. R2 read requests count one full-size read
-per view; thumbnails, retries, browsing metadata, ZIP delivery, and unrelated
-Worker requests can add cost. ZIP storage is approximated as another copy of
-the full event byte cap, a conservative upper bound. USD and EUR are left
-  separate rather than hiding exchange-rate changes; the EUR floors use the
-  reference rate above and are rounded estimates, not a payment quote.
+The reproducible calculation is `npm run cost -- [organizers] [event-slot-use]
+[average-pair-MiB] [full-size-views-per-photo] [email-USD]`; it reads the
+current limits from `shared/plans.js`. Each event's stored photo pairs are
+capped at the plan's byte limit, even when the count limit would permit more.
+The estimate includes the post-event ZIP as an additional copy of 90% of photo
+pair bytes and retains it for the plan's retention period. This 90% is an
+assumption to replace with measurements. It models the event itself as one day,
+then applies the retention period. R2 free allowances are set to zero because
+they are shared with other buckets; Cloudflare's rounding to whole billing
+units is applied conservatively. Each photo is viewed 100 times at full size.
+Worker CPU is assumed to be 7 ms per view, following Cloudflare's published
+example, not a Lumiq measurement. The high email case uses USD 20/month.
+The table uses a 2 MiB average photo pair, which fills each tier's byte
+allowance at its maximum photo count.
 
-| 100 customers, all on | Revenue/month | Approx. card fees | Approx. platform + storage + payment total/month | Per-account infra break-even |
-|---|---:|---:|---:|---:|
-| Single Event; 100 new purchases/month | EUR 1,500 one-time | EUR 47.50 | USD 33-53 + EUR 47.50 | about EUR 0.76-0.94 per sale at 100 sales/month |
-| Gathering; all 4 events used | EUR 3,000/month | EUR 70 | USD 45-65 + EUR 70 | about EUR 1.10-1.27 per subscriber/month |
-| Studio; all 12 events used | EUR 7,000/month | EUR 130 | USD 149-169 + EUR 130 | about EUR 2.61-2.78 per subscriber/month |
+| 100 customers, all on | Revenue/month | Platform/month | Stripe/month | Modeled costs/month | Contribution before excluded costs |
+|---|---:|---:|---:|---:|---:|
+| Single Event; 100 purchases/month | EUR 1,500 | USD 58.22 | EUR 47.50 | EUR 98.71 | EUR 1,401.29 |
+| Gathering; 4 events each | EUR 3,000 | USD 73.05 | EUR 70.00 | EUR 134.26 | EUR 2,865.74 |
+| Studio; 12 events each | EUR 7,000 | USD 229.61 | EUR 130.00 | EUR 331.99 | EUR 6,668.01 |
 
-Platform ranges include one Supabase Pro project, Workers Paid, R2 usage with
-no free-tier deduction, and $0-$20 email. Gathering assumes 400,000 R2 object
-writes, 20M full-size reads, and approximately 75 GB-month for photos plus ZIPs;
-R2 is about $10. Studio assumes 2.4024M writes (2.4M photo/thumb objects plus
-about 2,400 ZIP parts), 121.2M Class B reads (120M full-size views plus 1.2M
-source-photo reads for ZIP creation), and about 1.0 TB-month for photos plus
-ZIPs; R2 is about $69.54 without shared-account free-tier deductions, and
-Workers about $54.20 at the assumed request/CPU load. Queue operations for
-9,600 messages remain under the Paid monthly allowance. Single assumes 100,000 writes, 5M reads and
-approximately 18 GB-month for photos plus ZIPs; R2 is about $3. Total uses
-Cloudflare $5 minimum and Supabase $25, and gives a range for email. These
-figures are engineering arithmetic on current published unit rates, not a
-provider invoice forecast.
+Platform/month includes one Supabase Pro project, Workers Paid with modeled
+photo-view request/CPU usage, R2 storage/operations with no free-tier deduction,
+and USD 20 email. The model creates 50k / 200k / 1.2M photos respectively,
+each with 100 full-size views, and estimates 5.05M / 20.2M / 121.2M R2 reads
+(including one source read per photo to build each ZIP). Estimated Worker view
+requests are 5M / 20M / 120M. Other application requests, multipart ZIP
+operations, retries, backups, database scaling and cleanup delays are excluded,
+so this is still not an invoice or capacity guarantee. Run the model with
+different assumptions before interpreting it as a forecast.
 
-Single Event is sensitive to monthly sales count because the shared $30-$50
-base must be allocated over one-time purchases: at only 10 sales/month, the
-infrastructure break-even rises to roughly EUR 3.50-5.50 per sale; at one
-sale/month the business cannot cover shared fixed services from this product
-alone at EUR 15. Subscriptions make fixed-cost coverage more predictable.
+The modeled Single Event revenue assumes 100 new purchases each month. At only
+10 purchases, platform cost allocation per sale rises sharply; one sale/month
+cannot cover the shared production services alone. Subscription revenue is
+more predictable, but this scenario does not include tax, company costs or
+human support.
 
 ## Decision
 
-On direct infrastructure and card-processing costs alone, the existing EUR
-15 / EUR 30 / EUR 70 prices are well above the modeled break-even at 100
-customers in each tier. Even the conservative Studio scenario leaves about
-EUR 67 per customer/month before owner salary, support, tax and omitted
-business costs. **Do not lower public prices to the calculated infrastructure floors**:
-they only show that R2 storage is not currently the dominant expense. Keep
-current prices provisional until real traffic, photo sizes, ZIP CPU, support
-time, tax treatment and backups are measured.
+On this intentionally heavy but still incomplete infrastructure/card scenario,
+the existing EUR 15 / EUR 30 / EUR 70 prices exceed modeled service cost at
+100 customers in one tier. Studio leaves about EUR 67 per account/month before
+owner salary, support, tax and excluded costs. **This is not a profit forecast
+or price recommendation.** Do not lower or finalize prices using this model;
+measure real image sizes, traffic, ZIP jobs, backups and support time first.
 
 The result changes materially if Studio customer usage exceeds the modeled
 100 full-size views per photo, many previews repeatedly download originals,
@@ -114,9 +114,8 @@ reduces variable costs. Test capacity and enforce budgets/alerts before sales.
 
 ## Important correction to the previous storage-only estimate
 
-The capacity documents' “100 Studio” steady-state storage figure of 5.033 TB
-was ten times too high for the current 400 MiB/event, 12 events/month and
-30-day retention formula. Photo pairs alone are about 503 GB decimal at evenly
-distributed full quotas; including an equally large ZIP copy is about 1.01 TB.
-The published capacity tables have been corrected. This excludes backups,
-peak accumulation or cleanup delay.
+The earlier 400 MiB/event allowance yielded about 503 GB of Studio photo-pair
+storage at 100 fully active accounts. The current 2000 MiB/event allowance
+raises the 30-day photo-pair steady state to about 2.52 TB decimal; the modeled
+90%-size ZIP adds about 2.26 TB. This excludes backups, peak accumulation and
+cleanup delays.

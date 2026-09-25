@@ -13,7 +13,7 @@ test('publication allowance and Single Event purchases',async t=>{
  const publish=(u,e,funding='plan')=>app.events.action(u,e.id,{action:'publish',funding});
  try{
   await t.test('new plan limits and automatic expiry archive behavior',async()=>{
-   assert.deepEqual(['trial','single','gathering','studio'].map(id=>{const p=PLANS[id];return[p.price,p.photos,p.bytes/1024**2,p.durationDays,p.retentionDays,p.shareDays];}),[[0,50,30,1,7,4],[1500,500,200,3,14,7],[3000,500,200,3,14,7],[7000,1000,400,3,30,14]]);
+   assert.deepEqual(['trial','single','gathering','studio'].map(id=>{const p=PLANS[id];return[p.price,p.photos,p.bytes/1024**2,p.durationDays,p.retentionDays,p.shareDays];}),[[0,50,100,1,7,4],[1500,500,1000,3,14,7],[3000,500,1000,3,14,7],[7000,1000,2000,3,30,14]]);
    const u=await account('gathering'),e=await draft(u);await publish(u,e);
    await db.query("update events set starts_at=now()-interval '2 hours',ends_at=now()-interval '1 hour',retention_at=now()-interval '1 second',share_enabled=true where id=$1",[e.id]);
    const expired=await app.events.own(u,e.id);assert.equal(eventState(expired),'archived');

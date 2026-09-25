@@ -9,5 +9,6 @@ export const PLATFORM_MIGRATIONS = Object.freeze([
   {version:'008-organized-r2-keys',file:'migrations/008-organized-r2-keys.sql'},
   {version:'009-organizer-design-defaults',file:'migrations/009-organizer-design-defaults.sql'},
   {version:'010-event-isolated-designs',file:'migrations/010-event-isolated-designs.sql'},
-  {version:'011-queue-job-dispatch',file:'migrations/011-queue-job-dispatch.sql'}
+  {version:'011-queue-job-dispatch',file:'migrations/011-queue-job-dispatch.sql'},
+  {version:'012-tier-photo-capacity',file:'migrations/012-tier-photo-capacity.sql'}
 ]);
