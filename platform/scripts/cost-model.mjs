@@ -1,7 +1,7 @@
 import {PLANS} from '../shared/plans.js';
 import {estimateCosts} from '../shared/cost-model.js';
 
-const [, , subscribersArg, utilizationArg, averagePairArg, viewsArg, emailArg] = process.argv;
+const [, , subscribersArg, utilizationArg, averagePairArg, viewsArg, emailArg, thumbnailViewsArg] = process.argv;
 const result = estimateCosts({
   plans: PLANS,
   subscribers: Number(subscribersArg || 100),
@@ -9,6 +9,7 @@ const result = estimateCosts({
   averagePhotoPairMiB: Number(averagePairArg || 1.08),
   fullSizeViewsPerPhoto: Number(viewsArg || 100),
   emailUsd: Number(emailArg || 0),
+  thumbnailViewsPerPhoto: thumbnailViewsArg === undefined ? 100 : Number(thumbnailViewsArg),
 });
 
 console.log(JSON.stringify(result, null, 2));

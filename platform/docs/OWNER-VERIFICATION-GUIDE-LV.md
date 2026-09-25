@@ -216,6 +216,25 @@ Tīkla vairogs](https://www.tet.lv/biznesam/internets/tikla-vairogs).
    publiskie resolveri atgrieza Cloudflare IP. Lūdz pārbaudīt klasifikāciju un
    apstiprināt, kad bloķējums ir noņemts. Nesūti autentifikācijas saites,
    PIN, paroles vai signed URL.
+
+   Ziņojuma teksts, ko vari pielāgot:
+
+   > Labdien! Tet Drošība, atverot `https://lumiq.cam`, rāda STOP lapu ar
+   > kategoriju “Malware”. Lūdzu pārbaudīt šī domēna klasifikāciju un norādīt,
+   > kādi signāli izraisīja bloķēšanu. Agrāk šis domēns reizēm rādīja Lumiq
+   > izstrādes/staging vietni; 2026-09-25 tas tika pārslēgts uz slēgtu testa
+   > versiju ar Cloudflare Access. Domēns izmanto Cloudflare DNS/HTTPS;
+   > neatkarīgi DNS vaicājumi uz `1.1.1.1` un `8.8.8.8` atgrieza
+   > `104.21.67.110` un `172.67.221.99`, savukārt Tet tīkla resolveris
+   > atgrieza `195.122.12.177`, kuram pārlūks uzrādīja sertifikāta kļūdu
+   > `SEC_E_UNTRUSTED_ROOT`. Pievienoju STOP lapas ekrānattēlu un tās
+   > parādīšanās datumu/laiku. Lūdzu veikt atkārtotu pārbaudi un informēt,
+   > kad klasifikācija ir izlabota vai kādas darbības no domēna īpašnieka
+   > vēl nepieciešamas. Paldies!
+
+   Pievieno datumu/laiku un ekrānattēlu. Ja Tet prasa īpašumtiesību
+   apliecinājumu, sniedz to tikai Tet oficiālajā atbalsta kanālā. Nekopīgo
+   Access PIN, paroles, autentifikācijas URL vai sensitīvus Worker datus.
 3. Saglabā Tet atbildi un incidenta/references numuru. Kamēr nav atbildes,
    izmanto slēgto testa `workers.dev` hostname tikai caur tā Access aizsardzību;
    produkta lietotājiem un viesiem `lumiq.cam` nedod.

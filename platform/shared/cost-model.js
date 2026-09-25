@@ -28,13 +28,14 @@ export function estimateCosts({
   originalFraction = 0.9,
   eventDurationDays = 1,
   fullSizeViewsPerPhoto = 100,
+  thumbnailViewsPerPhoto = 100,
   emailUsd = 0,
   billing = BILLING,
 } = {}) {
   if (!plans || !Number.isFinite(subscribers) || subscribers < 0) throw new Error('Invalid plan or subscriber count');
   if (Math.abs(Object.values(mix).reduce((sum, share) => sum + share, 0) - 1) > 1e-9) throw new Error('Plan mix must sum to 1');
   if (![eventUtilization, originalFraction].every((n) => Number.isFinite(n) && n >= 0 && n <= 1)) throw new Error('Utilization and original fraction must be between 0 and 1');
-  if (![averagePhotoPairMiB, eventDurationDays, fullSizeViewsPerPhoto, emailUsd].every((n) => Number.isFinite(n) && n >= 0)) throw new Error('Usage assumptions must be non-negative numbers');
+  if (![averagePhotoPairMiB, eventDurationDays, fullSizeViewsPerPhoto, thumbnailViewsPerPhoto, emailUsd].every((n) => Number.isFinite(n) && n >= 0)) throw new Error('Usage assumptions must be non-negative numbers');
 
   let revenueEur = 0;
   let paymentCount = 0;
@@ -72,12 +73,13 @@ export function estimateCosts({
 
   const totalGbMonths = photoPairGbMonths + zipGbMonths;
   const imageViews = photos * fullSizeViewsPerPhoto;
+  const thumbnailViews = photos * thumbnailViewsPerPhoto;
   const r2Writes = photos * 2 + events;
-  const r2Reads = imageViews + photos;
+  const r2Reads = imageViews + thumbnailViews + photos;
   const r2StorageUsd = ceilBillable(totalGbMonths, billing.r2FreeStorageGbMonth, 1) * billing.r2StoragePerGbMonth;
   const r2ClassAUsd = ceilBillable(r2Writes, billing.r2FreeClassA, 1_000_000) * billing.r2ClassAByMillion;
   const r2ClassBUsd = ceilBillable(r2Reads, billing.r2FreeClassB, 1_000_000) * billing.r2ClassBByMillion;
-  const workerRequests = imageViews;
+  const workerRequests = imageViews + thumbnailViews;
   const workerCpuMs = workerRequests * 7;
   const workerUsd = billing.workerBaseUsd
     + ceilBillable(workerRequests, billing.workerIncludedRequests, 1_000_000) * billing.workerRequestPerMillionUsd
@@ -88,7 +90,7 @@ export function estimateCosts({
   const totalCostEur = platformUsd * billing.usdToEur + stripeEur;
 
   return {
-    assumptions: { subscribers, mix, eventUtilization, averagePhotoPairMiB, originalFraction, eventDurationDays, fullSizeViewsPerPhoto, emailUsd, freeR2AllowancesApplied: billing.r2FreeStorageGbMonth > 0 || billing.r2FreeClassA > 0 || billing.r2FreeClassB > 0 },
+    assumptions: { subscribers, mix, eventUtilization, averagePhotoPairMiB, originalFraction, eventDurationDays, fullSizeViewsPerPhoto, thumbnailViewsPerPhoto, emailUsd, freeR2AllowancesApplied: billing.r2FreeStorageGbMonth > 0 || billing.r2FreeClassA > 0 || billing.r2FreeClassB > 0 },
     monthly: {
       revenueEur: +revenueEur.toFixed(2),
       paymentCount: +paymentCount.toFixed(1),
@@ -97,6 +99,7 @@ export function estimateCosts({
       photoPairGbMonths: +photoPairGbMonths.toFixed(2),
       zipGbMonths: +zipGbMonths.toFixed(2),
       zipBytes: Math.round(zipBytes),
+      thumbnailViews: Math.round(thumbnailViews),
       r2Writes: Math.round(r2Writes),
       r2Reads: Math.round(r2Reads),
       workerRequests: Math.round(workerRequests),

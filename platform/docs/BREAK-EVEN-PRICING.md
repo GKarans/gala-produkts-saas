@@ -61,35 +61,42 @@ Live vendor price pages: [Workers](https://developers.cloudflare.com/workers/pla
 ## High-usage scenario
 
 The reproducible calculation is `npm run cost -- [organizers] [event-slot-use]
-[average-pair-MiB] [full-size-views-per-photo] [email-USD]`; it reads the
-current limits from `shared/plans.js`. Each event's stored photo pairs are
+[average-pair-MiB] [full-size-views-per-photo] [email-USD]
+[thumbnail-views-per-photo]`; it reads the current limits from
+`shared/plans.js`. Each event's stored photo pairs are
 capped at the plan's byte limit, even when the count limit would permit more.
 The estimate includes the post-event ZIP as an additional copy of 90% of photo
 pair bytes and retains it for the plan's retention period. This 90% is an
 assumption to replace with measurements. It models the event itself as one day,
 then applies the retention period. R2 free allowances are set to zero because
 they are shared with other buckets; Cloudflare's rounding to whole billing
-units is applied conservatively. Each photo is viewed 100 times at full size.
-Worker CPU is assumed to be 7 ms per view, following Cloudflare's published
+units is applied conservatively. Each photo is viewed 100 times at full size
+and its thumbnail is requested 100 times as a separate image load. The app
+serves both through Worker endpoints with `Cache-Control: private, no-store`;
+the model counts each as one Worker request and one R2 Class B read. Worker CPU
+is assumed to be 7 ms per image request, following Cloudflare's published
 example, not a Lumiq measurement. The high email case uses USD 20/month.
 The table uses a 2 MiB average photo pair, which fills each tier's byte
 allowance at its maximum photo count.
 
 | 100 customers, all on | Revenue/month | Platform/month | Stripe/month | Modeled costs/month | Contribution before excluded costs |
 |---|---:|---:|---:|---:|---:|
-| Single Event; 100 purchases/month | EUR 1,500 | USD 58.22 | EUR 47.50 | EUR 98.71 | EUR 1,401.29 |
-| Gathering; 4 events each | EUR 3,000 | USD 73.05 | EUR 70.00 | EUR 134.26 | EUR 2,865.74 |
-| Studio; 12 events each | EUR 7,000 | USD 229.61 | EUR 130.00 | EUR 331.99 | EUR 6,668.01 |
+| Single Event; 100 purchases/month | EUR 1,500 | USD 60.72 | EUR 47.50 | EUR 100.91 | EUR 1,399.09 |
+| Gathering; 4 events each | EUR 3,000 | USD 89.05 | EUR 70.00 | EUR 148.34 | EUR 2,851.66 |
+| Studio; 12 events each | EUR 7,000 | USD 325.61 | EUR 130.00 | EUR 416.44 | EUR 6,583.56 |
 
 Platform/month includes one Supabase Pro project, Workers Paid with modeled
-photo-view request/CPU usage, R2 storage/operations with no free-tier deduction,
-and USD 20 email. The model creates 50k / 200k / 1.2M photos respectively,
-each with 100 full-size views, and estimates 5.05M / 20.2M / 121.2M R2 reads
-(including one source read per photo to build each ZIP). Estimated Worker view
-requests are 5M / 20M / 120M. Other application requests, multipart ZIP
-operations, retries, backups, database scaling and cleanup delays are excluded,
-so this is still not an invoice or capacity guarantee. Run the model with
-different assumptions before interpreting it as a forecast.
+full-size and thumbnail request/CPU usage, R2 storage/operations with no
+free-tier deduction, and USD 20 email. The model creates 50k / 200k / 1.2M
+photos respectively, each with 100 full-size and 100 thumbnail views, and
+estimates 10.05M / 40.2M / 241.2M R2 reads (including one source read per photo
+to build each ZIP). Estimated Worker image requests are 10M / 40M / 240M.
+Other application requests, ZIP-part writes/downloads, multipart operations,
+retries, backups, database scaling and cleanup delays are excluded. Worker
+Paid usage is metered without an overall bill hard cap; this is neither an
+invoice nor a maximum-cost guarantee. Actual thumbnail views can greatly exceed
+full-size views. Run the model with different assumptions before interpreting
+it as a forecast.
 
 The modeled Single Event revenue assumes 100 new purchases each month. At only
 10 purchases, platform cost allocation per sale rises sharply; one sale/month
@@ -101,16 +108,20 @@ human support.
 
 On this intentionally heavy but still incomplete infrastructure/card scenario,
 the existing EUR 15 / EUR 30 / EUR 70 prices exceed modeled service cost at
-100 customers in one tier. Studio leaves about EUR 67 per account/month before
-owner salary, support, tax and excluded costs. **This is not a profit forecast
-or price recommendation.** Do not lower or finalize prices using this model;
-measure real image sizes, traffic, ZIP jobs, backups and support time first.
+100 customers in one tier. Studio leaves about EUR 65.84 per account/month
+before owner salary, support, tax and excluded costs. **This is not a profit
+forecast or price recommendation.** Do not lower or finalize prices using this
+model; measure real image sizes, thumbnail/full-size traffic, ZIP jobs, backups
+and support time first.
 
-The result changes materially if Studio customer usage exceeds the modeled
-100 full-size views per photo, many previews repeatedly download originals,
-photos/ZIPs are retained past policy, abuse drives traffic, Cloudflare/Supabase
-need larger plans, or backup copies are kept. Conversely, lower average use
-reduces variable costs. Test capacity and enforce budgets/alerts before sales.
+The result changes materially if customer usage exceeds the modeled 100 full-
+size plus 100 thumbnail views per photo, photos/ZIPs are retained past policy,
+abuse drives traffic, Cloudflare/Supabase need larger plans, or backup copies
+are kept. The R2 adapter's Class B ceiling fails closed before additional R2
+reads, but it does not undo the Worker request/CPU charge already incurred and
+there is no overall Workers Paid bill ceiling. Cloudflare rate controls,
+monitoring, incident response and measured traffic limits are required before
+sales. Conversely, lower average use reduces variable costs.
 
 ## Important correction to the previous storage-only estimate
 

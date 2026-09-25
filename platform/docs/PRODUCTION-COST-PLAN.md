@@ -10,13 +10,17 @@ resources.
 
 ## Current deployment facts
 
-- The current `lumiq.cam` Worker is explicitly configured as staging and uses
-  the `lumiq-staging-photos` bucket and the existing staging Hyperdrive binding.
+- `lumiq.cam` is currently attached to the closed-test Worker behind
+  Cloudflare Access, not the former staging Worker. It uses the isolated
+  closed-test Supabase project/Hyperdrive and `lumiq-closed-test-photos` bucket.
+  The former staging Worker, Hyperdrive, database and bucket remain intact and
+  detached from the domain; nothing in staging was deleted.
 - Production must use a fresh Supabase project and a separate private R2
   bucket. Staging data is not to be copied into production.
 - The owner created a separate Supabase Free test project. The owner has since
   applied and verified migrations `001-platform` through
-  `011-queue-job-dispatch`, RLS on all 17 protected tables, denied
+  `011-queue-job-dispatch` and `012-tier-photo-capacity`, RLS on all 17
+  protected tables, denied
   anon/authenticated SELECT, and the
   restricted `lumiq_runtime` database role. No MVP migration was run. This
   closed-test project must not be described as production, and no staging
@@ -45,14 +49,15 @@ resources.
 | Service | Candidate | Price basis | Production caveat |
 |---|---|---|---|
 | PostgreSQL/Auth | One fresh Supabase Pro project, Micro compute | USD 25/month, about EUR 21.99 at the 2026-09-24 ECB reference rate, before tax/FX. The Pro plan includes USD 10 compute credits, enough for one Micro project. | Keep Micro and spend cap; compute and some add-ons are not covered by the cap. Check the actual organization invoice estimate before creating the project. |
-| App/API/static assets | Cloudflare Workers Paid for the modeled maximum-use Studio service | USD 5/month account minimum | Workers Paid includes 10M dynamic requests and 30M CPU-ms/month; excess is metered, with no bandwidth egress charge. Hyperdrive has no separate Paid-plan fee. At 100 Studio accounts using all limits and 100 full-size views per photo, the model is about 120M image requests/month (about 4M/day) before uploads and other app requests, far above the Workers Free 100,000/day ceiling. Workers Free is only a strictly limited pilot option after measured traffic proves it fits. |
+| App/API/static assets | Cloudflare Workers Paid for the modeled high-usage Studio service | USD 5/month account minimum | Workers Paid includes 10M dynamic requests and 30M CPU-ms/month; excess is metered, with no bandwidth egress charge or overall bill hard cap. Hyperdrive has no separate Paid-plan fee. At 100 Studio accounts using all event/photo limits and 100 full-size plus 100 thumbnail views per photo, the model is about 240M image requests/month (about 8M/day), before uploads and other app requests. This is far above Workers Free's 100,000/day request limit. |
 | Private photo objects | New private R2 Standard bucket | USD 0 only within 10 GB-month, 1 million Class A and 10 million Class B operations/month; egress is free. | Usage beyond free allocations is metered. An application-enforced aggregate storage/operation ceiling and account-level usage check are required before real guest uploads. |
 | Transactional email | Defer custom sender decision; use no paid add-on initially | USD 0 candidate | Verify Supabase Auth delivery limits and recovery flow before inviting real organizers. |
 
-For the maximum-use production candidate, the minimum fixed baseline is USD
+For the candidate production service, the minimum fixed baseline is USD
 30/month (Supabase Pro USD 25 plus Workers Paid USD 5; about EUR 26.39 at the
 ECB reference rate in `BREAK-EVEN-PRICING.md`, before tax and payment conversion).
-This is not a guarantee that the entire bill stays below EUR 60: R2 overages,
+This is not a guarantee that the entire bill stays below EUR 60; the modeled
+high-usage variable costs already exceed that baseline. R2 overages,
 email, extra Supabase compute/projects, tax, FX fees, backups and existing
 account-level subscriptions/usage are not included. Cloudflare budget alerts
 are informational, not a billing hard stop. Supabase's spend cap excludes
@@ -75,8 +80,9 @@ production launch.
 
 - [x] Owner declined the USD 25/month Supabase Pro option for now.
 - [x] Owner decision: defer paid production resources until after `lumiq.cam`
-      has been transitioned and the company is registered. This does not
-      authorize spending or public production use of test resources.
+      has been transitioned and the company is registered. The domain has now
+      been transitioned only to a closed pilot behind Access, not production.
+      This does not authorize spending or public production use of test resources.
 - [x] Current scope is a free closed test only; no public launch, paying
       customers, or real guest-photo collection.
 - [x] Owner created a separate Supabase Free project. Keep staging untouched
@@ -98,6 +104,10 @@ production launch.
       set `PLATFORM_ORIGIN`, then deploy the separate test Worker. An anonymous
       `/healthz` request redirected to Access before Worker execution. Keep
       staging Hyperdrive, Worker, bucket and DNS untouched.
+- [x] Attach `lumiq.cam` to the closed-test Worker behind Access. Tet's network
+      security filter currently classifies the hostname as Malware; request
+      provider review and do not bypass the warning or open public access until
+      the classification and certificate warning are resolved.
 - [ ] Configure the test environment using local secrets (never commit them),
       then verify Hyperdrive DB access, Auth, storage controls and core journeys.
 - [ ] After company registration and the controlled `lumiq.cam` transition,
