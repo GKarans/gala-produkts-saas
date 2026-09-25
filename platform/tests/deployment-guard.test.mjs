@@ -7,13 +7,13 @@ import {fileURLToPath} from 'node:url';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 
-test('Cloudflare npm aliases cannot target the live staging config',async()=>{
+test('Cloudflare npm aliases cannot recreate deleted staging resources',async()=>{
  const pkg=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));
  assert.match(pkg.scripts['cloudflare:dev'],/platform\/scripts\/block-deploy\.mjs --dev/);
  assert.match(pkg.scripts['cloudflare:deploy'],/platform\/scripts\/block-deploy\.mjs/);
  for(const args of [[],['--dev']]){
   const result=spawnSync(process.execPath,[path.join(root,'platform/scripts/block-deploy.mjs'),...args],{encoding:'utf8'});
   assert.equal(result.status,1);
-  assert.match(result.stderr,/existing lumiq\.cam staging Worker and its data/);
+  assert.match(result.stderr,/legacy lumiq-cam Worker and its staging Hyperdrive\/R2 resources were deleted/);
  }
 });

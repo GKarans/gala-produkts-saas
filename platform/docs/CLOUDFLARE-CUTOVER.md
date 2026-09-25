@@ -1,50 +1,52 @@
 # Cloudflare Production Cutover
 
-Status: `lumiq.cam` was owner-approved and moved to the closed-test Worker on
-2026-09-25 as an Access-gated development pilot, not production. The active
-candidate is `lumiq-closed-test` version
-`18339063-de58-4c3b-9dae-051b254a89d6`, isolated to test resources. Normal
-access from the owner's Tet network is currently blocked by a `Malware`
-warning and mismatched DNS/TLS; do not bypass it. Production resources and a
-public-production cutover remain unapproved/unprovisioned. This file's
-remaining cutover procedure applies to the future production launch.
+Status (2026-09-25): `lumiq.cam` is served by the Access-gated closed-test
+Worker, not production. Production resources and a public-production cutover
+remain unapproved/unprovisioned. Old staging Worker, Hyperdrive and both
+staging R2 buckets have been deleted. The owner's Supabase staging project
+deletion is reported but not independently verified. This file's remaining
+cutover procedure applies only to the future production launch.
 
 ## Non-negotiable boundary
 
 The active `lumiq.cam` hostname currently reaches the closed-test Worker behind
-Cloudflare Access. The old staging Worker `lumiq-cam` remains deployed without
-the `lumiq.cam` custom domain; its staging DB, bucket and data remain intact.
-Do not use the checked-in `cloudflare/worker/wrangler.jsonc` to deploy new
-code: it targets the old staging Worker and its data. Keep production
-resources in a separate, owner-controlled configuration and secret set.
+Cloudflare Access. The old `lumiq-cam` Worker and its Cloudflare staging
+resources are deleted, and its checked-in Wrangler config has been removed.
+Do not recreate staging resources. Keep any future production resources in a
+separate, owner-controlled configuration and secret set.
 
 Cloudflare Worker versions include code, assets, bindings and compatibility
-settings. A percentage rollout between a staging version and a production
+settings. A percentage rollout between a test version and a production
 version would send requests to different databases/buckets; do not do this for
 Lumiq. Test candidate code against isolated production resources on a separate
 Worker behind Access, then switch the domain once. A version-level rollback
 restores code/config across routes, but does not rewind database or object
-storage data. Never roll production traffic back to a version bound to staging.
+storage data. Never roll production traffic back to a version bound to
+closed-test resources.
 
 ## Owner's two-phase launch decision
 
 The owner has deferred paid production resources until after `lumiq.cam` has
 transitioned and the company is registered. Treat these as separate
-milestones, not permission to expose the current staging-backed Worker publicly:
+milestones, not permission to expose the current closed-test Worker publicly:
 
 1. The owner-approved pre-company transition has been completed as a closed
    pilot on isolated test resources behind an allowlisted Cloudflare Access
-   policy. Anonymous requests pinned to a Cloudflare edge address receive an
-   Access challenge, but authenticated app/Auth flow and normal-network access
-   are not yet verified. A Tet security warning currently blocks the owner's
-   normal DNS path; keep the service closed and do not bypass that warning.
+   policy. The latest diagnostic request pinned to a Cloudflare IP and the
+   closed-test `workers.dev` request passed normal TLS and received the expected
+   Access challenge. The ordinary `lumiq.cam` request failed Windows Schannel
+   verification with `SEC_E_UNTRUSTED_ROOT`, despite default DNS matching
+   Cloudflare. Authenticated app/Auth flow is not yet verified. Tet's earlier
+   security warning was not reproduced in this probe; no official Tet
+   classification clearance has been received. Keep the service closed and
+   never bypass a certificate or security warning.
 2. After company registration and a fresh cost review explicitly approved by
    the owner, provision separate paid production resources and complete every
    production gate below before opening the service to customers.
 
-The existing staging-backed `lumiq-cam` Worker is not an acceptable public
-production target. A domain move by itself does not turn staging into
-production, and this procedure does not authorize changing the live domain.
+The closed-test Worker is not an acceptable public production target. A domain
+move by itself does not turn test resources into production, and this
+procedure does not authorize changing the live domain.
 
 ## Before a cutover can be scheduled
 
@@ -53,10 +55,10 @@ approval. In addition:
 
 1. Create a production Supabase project, restricted runtime role, Hyperdrive
    config and private R2 bucket. Verify their account/project/bucket identities
-   independently. Production must not share the staging database, R2 bucket,
-   auth project, credentials or Access policy.
+   independently. Production must not share the closed-test database, R2
+   bucket, auth project, credentials or Access policy.
 2. Configure production-only secrets in an isolated candidate Worker. Keep
-   `lumiq-cam` and its staging secrets/bindings unchanged during candidate
+   the closed-test Worker and its secrets/bindings unchanged during candidate
    testing. Give the candidate a distinct Worker name, `workers.dev` hostname,
    no custom domain, and an Access allowlist limited to the owner/testers.
    Before deployment, run `npx wrangler hyperdrive list` and pass the current
@@ -89,9 +91,10 @@ approval. In addition:
    Hyperdrive origin; it must match the Supabase Auth URL. No wildcard auth
    redirects.
 7. Record the current production-candidate version, the closed-test Worker
-   version, the detached `lumiq-cam` staging version/resource IDs, domain/TLS
-   state, and a rollback/maintenance response that never exposes test or
-   staging data to production users.
+   version and its test-only bindings, current domain/TLS state, and a
+   rollback/maintenance response that never exposes test data to production
+   users. The retired `lumiq-cam` Worker and staging resources were deleted;
+   their historical IDs are not rollback targets.
 
 ## Cutover window
 
@@ -105,10 +108,12 @@ checks the evidence. Warn testers that the site may briefly be unavailable.
    do not paste secret values into logs, chat or screenshots.
 3. Set Supabase Site URL and exact allowed redirects to `https://lumiq.cam`.
    Set the candidate's canonical origin to `https://lumiq.cam`. Do not send
-   auth emails during the interval while the root domain still reaches staging.
+   auth emails during the interval while the root domain still reaches the
+   closed-test Worker.
 4. Remove the existing `lumiq.cam` Custom Domain association from the
    closed-test Worker, then attach the domain to the already-tested production
-   candidate in Cloudflare. The old staging Worker is already detached. Do not
+   candidate in Cloudflare. The former staging Worker was deleted, so it is
+   not an intermediate route or fallback. Do not
    change Namecheap nameservers or add guessed DNS records; Cloudflare Custom
    Domains manages its DNS record and certificate.
 5. Confirm the production Worker is the sole owner of `lumiq.cam`, TLS validates
@@ -127,17 +132,18 @@ checks the evidence. Warn testers that the site may briefly be unavailable.
 ### Before any real customer writes
 
 If the smoke test fails, stop new writes and contain the hostname with Access
-or maintenance mode. Do not restore the old `lumiq-cam` version: it is bound to
-staging data. Before any production customer data exists, the closed-test
-version may be restored only as a clearly labeled closed test, with Access
+or maintenance mode. Do not restore the retired `lumiq-cam` Worker: it and its
+staging resources were deleted. Before any production customer data exists,
+the closed-test version may be restored only as a clearly labeled closed test, with Access
 enabled and the test DB/R2 bindings verified. Never copy production data into
-test or staging. Correct the candidate and repeat all failed checks before
+test resources. Correct the candidate and repeat all failed checks before
 another cutover.
 
 ### After production data exists
 
-Do not reattach the staging Worker, and do not roll back to a version whose
-bindings or secrets point at staging. First contain access (disable registration
+The staging Worker was deleted; do not recreate it. Do not roll back to a
+version whose bindings or secrets point at the closed-test environment. First
+contain access (disable registration
 and uploads or restrict the hostname to the operator), preserve logs and take
 a fresh production backup. Roll back only to a separately tested,
 production-compatible Worker version that is still bound to the production

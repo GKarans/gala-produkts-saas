@@ -2,12 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {validateProductionConfig, validateRemoteHyperdriveProject} from "../scripts/production-preflight.mjs";
 
-const staging = {
-  name: "lumiq-cam",
-  hyperdrive: [{binding: "HYPERDRIVE", id: "96846aaf46fd470e96f0313b09e1d01a"}],
-  r2_buckets: [{binding: "R2_PHOTOS", bucket_name: "lumiq-staging-photos"}]
-};
-
 function candidate() {
   return {
     name: "lumiq-production-candidate",
@@ -39,66 +33,68 @@ function candidate() {
 const testHyperdriveId = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
 test("production preflight accepts isolated candidate with budget and queue recovery", () => {
-  const result = validateProductionConfig(candidate(), staging, testHyperdriveId);
+  const result = validateProductionConfig(candidate(), testHyperdriveId);
   assert.equal(result.worker, "lumiq-production-candidate");
   assert.equal(result.bucket, "lumiq-production-photos");
   assert.equal(result.queue, "lumiq-production-jobs");
 });
 
-test("production preflight rejects shared DB, bucket, domain and missing budget or DLQ", () => {
+test("production preflight rejects closed-test resources, retired names and missing budget or DLQ", () => {
   const sharedDb = candidate();
-  sharedDb.hyperdrive[0].id = staging.hyperdrive[0].id;
-  assert.throws(() => validateProductionConfig(sharedDb, staging, testHyperdriveId), /must not reuse/);
+  sharedDb.hyperdrive[0].id = testHyperdriveId;
+  assert.throws(() => validateProductionConfig(sharedDb, testHyperdriveId), /must not reuse/);
 
-  const testDb = candidate();
-  testDb.hyperdrive[0].id = testHyperdriveId;
-  assert.throws(() => validateProductionConfig(testDb, staging, testHyperdriveId), /must not reuse/);
+  const retiredWorker = candidate();
+  retiredWorker.name = "lumiq-cam";
+  assert.throws(() => validateProductionConfig(retiredWorker, testHyperdriveId), /separate Worker name/);
 
-  const sharedBucket = candidate();
-  sharedBucket.r2_buckets[0].bucket_name = "lumiq-staging-photos";
-  assert.throws(() => validateProductionConfig(sharedBucket, staging, testHyperdriveId), /production-\*/);
+  for (const bucket of ["lumiq-staging-photos", "lumiq-closed-test-photos", "app-images"]) {
+    const sharedBucket = candidate();
+    sharedBucket.r2_buckets[0].bucket_name = bucket;
+    assert.throws(() => validateProductionConfig(sharedBucket, testHyperdriveId), /production-\*/);
+  }
 
   const customDomain = candidate();
   customDomain.routes = [{pattern: "lumiq.cam", custom_domain: true}];
-  assert.throws(() => validateProductionConfig(customDomain, staging, testHyperdriveId), /must not claim/);
+  assert.throws(() => validateProductionConfig(customDomain, testHyperdriveId), /must not claim/);
 
   const noBudget = candidate();
   noBudget.vars.R2_BUDGET_ENABLED = "false";
-  assert.throws(() => validateProductionConfig(noBudget, staging, testHyperdriveId), /hard stop/);
+  assert.throws(() => validateProductionConfig(noBudget, testHyperdriveId), /hard stop/);
 
   const noDlq = candidate();
   noDlq.queues.consumers[0].dead_letter_queue = undefined;
-  assert.throws(() => validateProductionConfig(noDlq, staging, testHyperdriveId), /DLQ/);
+  assert.throws(() => validateProductionConfig(noDlq, testHyperdriveId), /DLQ/);
 });
 
 test("production preflight rejects unsafe public variables and disabled preview protection", () => {
   const wrongDbProject = candidate();
   wrongDbProject.vars.PLATFORM_SUPABASE_PROJECT_REF = "otherproject123";
-  assert.throws(() => validateProductionConfig(wrongDbProject, staging, testHyperdriveId), /project reference must match/);
+  assert.throws(() => validateProductionConfig(wrongDbProject, testHyperdriveId), /project reference must match/);
 
   const secretInVars = candidate();
   secretInVars.vars.PLATFORM_SESSION_ENCRYPTION_KEY = "must-not-be-inline";
-  assert.throws(() => validateProductionConfig(secretInVars, staging, testHyperdriveId), /secret bindings/);
+  assert.throws(() => validateProductionConfig(secretInVars, testHyperdriveId), /secret bindings/);
 
   const databaseUrlInVars = candidate();
   databaseUrlInVars.vars.PLATFORM_DATABASE_URL = "postgres://must-not-be-inline";
-  assert.throws(() => validateProductionConfig(databaseUrlInVars, staging, testHyperdriveId), /secret bindings/);
+  assert.throws(() => validateProductionConfig(databaseUrlInVars, testHyperdriveId), /secret bindings/);
 
   const previews = candidate();
   previews.preview_urls = true;
-  assert.throws(() => validateProductionConfig(previews, staging, testHyperdriveId), /preview URLs disabled/);
+  assert.throws(() => validateProductionConfig(previews, testHyperdriveId), /preview URLs disabled/);
 
   const otherWorkersOrigin = candidate();
   otherWorkersOrigin.vars.PLATFORM_ORIGIN = "https://another-worker.example.workers.dev";
-  assert.throws(() => validateProductionConfig(otherWorkersOrigin, staging, testHyperdriveId), /own bare HTTPS/);
+  assert.throws(() => validateProductionConfig(otherWorkersOrigin, testHyperdriveId), /own bare HTTPS/);
 
   const environmentOverride = candidate();
   environmentOverride.env = {production: {vars: {PLATFORM_MODE: "production"}}};
-  assert.throws(() => validateProductionConfig(environmentOverride, staging, testHyperdriveId), /Named Wrangler environments/);
+  assert.throws(() => validateProductionConfig(environmentOverride, testHyperdriveId), /Named Wrangler environments/);
 
   const extraService = candidate();
   extraService.services = [{binding: "STAGING_WORKER", service: "lumiq-cam"}];
-  assert.throws(() => validateProductionConfig(extraService, staging, testHyperdriveId), /Unexpected services/);
+  assert.throws(() => validateProductionConfig(extraService, testHyperdriveId), /Unexpected services/);
 });
 
 test("remote Hyperdrive identity must match the isolated Supabase project", () => {

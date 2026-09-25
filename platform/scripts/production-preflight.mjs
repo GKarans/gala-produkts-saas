@@ -15,11 +15,11 @@ function oneBinding(items, name, field) {
   return matches[0];
 }
 
-export function validateProductionConfig(candidate, staging, closedTestHyperdriveId) {
+export function validateProductionConfig(candidate, closedTestHyperdriveId) {
   requireThat(candidate && typeof candidate === "object", "Production config must be an object.");
   requireThat(typeof closedTestHyperdriveId === "string" && /^[a-f0-9]{32}$/i.test(closedTestHyperdriveId), "Supply the current closed-test Hyperdrive ID.");
   requireThat(typeof candidate.name === "string" && candidate.name.length > 0, "Production worker name is required.");
-  requireThat(![staging.name, "lumiq-closed-test"].includes(candidate.name), "Production candidate must use a separate Worker name.");
+  requireThat(!["lumiq-cam", "lumiq-closed-test"].includes(candidate.name), "Production candidate must use a separate Worker name.");
   requireThat(candidate.workers_dev === true && candidate.preview_urls === false, "Candidate must use workers.dev with preview URLs disabled.");
   requireThat(!candidate.env || Object.keys(candidate.env).length === 0, "Named Wrangler environments require a separate reviewed preflight.");
   requireThat(!candidate.routes?.length, "Candidate must not claim custom domains or routes.");
@@ -38,17 +38,15 @@ export function validateProductionConfig(candidate, staging, closedTestHyperdriv
   requireThat(typeof vars.PLATFORM_SUPABASE_PUBLISHABLE_KEY === "string" && vars.PLATFORM_SUPABASE_PUBLISHABLE_KEY.length > 0, "Supabase publishable key is required.");
   requireThat(!Object.keys(vars).some(key => /(?:SECRET|TOKEN|PASSWORD|DATABASE_URL|ACCESS_KEY|SERVICE_ROLE|PRIVATE_KEY|SESSION_ENCRYPTION_KEY|EMAIL_KEY)/i.test(key)), "Secrets must be configured with secret bindings, not vars.");
 
-  const stageDb = oneBinding(staging.hyperdrive, "HYPERDRIVE", "Hyperdrive");
   const prodDb = oneBinding(candidate.hyperdrive, "HYPERDRIVE", "Hyperdrive");
   requireThat(candidate.hyperdrive.length === 1, "Production config must not include additional Hyperdrive bindings.");
   requireThat(/^[a-f0-9]{32}$/i.test(prodDb.id || ""), "Production Hyperdrive ID is invalid.");
-  requireThat(prodDb.id.toLowerCase() !== stageDb.id.toLowerCase() && prodDb.id.toLowerCase() !== closedTestHyperdriveId.toLowerCase(), "Production must not reuse staging or closed-test Hyperdrive.");
+  requireThat(prodDb.id.toLowerCase() !== closedTestHyperdriveId.toLowerCase(), "Production must not reuse the closed-test Hyperdrive.");
 
-  const stageR2 = oneBinding(staging.r2_buckets, "R2_PHOTOS", "R2");
   const prodR2 = oneBinding(candidate.r2_buckets, "R2_PHOTOS", "R2");
   requireThat(candidate.r2_buckets.length === 1, "Production config must not include additional R2 buckets.");
   requireThat(typeof prodR2.bucket_name === "string" && /^lumiq-production-[a-z0-9-]+$/.test(prodR2.bucket_name), "Production R2 bucket must use the lumiq-production-* namespace.");
-  requireThat(prodR2.bucket_name !== stageR2.bucket_name && prodR2.bucket_name !== "lumiq-closed-test-photos" && prodR2.bucket_name !== "app-images", "Production must not reuse a staging, test or legacy bucket.");
+  requireThat(!["lumiq-staging-photos", "lumiq-closed-test-photos", "app-images"].includes(prodR2.bucket_name), "Production must not reuse a staging, test or legacy bucket.");
 
   requireThat(vars.R2_BUDGET_ENABLED === "true", "Production requires the R2 usage hard stop.");
   for (const key of ["R2_MAX_CLASS_A_OPS_MONTH", "R2_MAX_CLASS_B_OPS_MONTH", "R2_MAX_LIFETIME_WRITE_BYTES", "R2_MAX_STREAM_WRITE_BYTES"]) {
@@ -112,11 +110,8 @@ async function main() {
   const testIdArg = args.find(value => value.startsWith("--closed-test-hyperdrive-id="));
   requireThat(candidatePath && testIdArg, "Usage: npm run production:preflight -- <production-wrangler-config.jsonc> --closed-test-hyperdrive-id=<id>");
   const candidateFile = path.resolve(candidatePath);
-  const [candidate, staging] = await Promise.all([
-    readConfig(candidateFile),
-    readConfig(path.join(root, "cloudflare/worker/wrangler.jsonc"))
-  ]);
-  const result = validateProductionConfig(candidate, staging, testIdArg.split("=", 2)[1]);
+  const candidate = await readConfig(candidateFile);
+  const result = validateProductionConfig(candidate, testIdArg.split("=", 2)[1]);
   const remoteDatabase = validateRemoteHyperdriveProject(
     getRemoteHyperdriveConfig(result.hyperdriveId),
     result.hyperdriveId,

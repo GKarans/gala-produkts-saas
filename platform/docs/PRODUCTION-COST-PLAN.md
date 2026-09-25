@@ -13,8 +13,12 @@ resources.
 - `lumiq.cam` is currently attached to the closed-test Worker behind
   Cloudflare Access, not the former staging Worker. It uses the isolated
   closed-test Supabase project/Hyperdrive and `lumiq-closed-test-photos` bucket.
-  The former staging Worker, Hyperdrive, database and bucket remain intact and
-  detached from the domain; nothing in staging was deleted.
+  The former `lumiq-cam` Worker, staging Hyperdrive, and both staging R2 buckets
+  (default and EU) were deleted. The owner reports that the old staging
+  Supabase project was also deleted; that part has not been independently
+  verified. The closed-test R2 bucket remains, but its test objects were
+  accidentally deleted; the owner confirmed they were disposable and no
+  restore is needed. `app-images` was not touched.
 - Production must use a fresh Supabase project and a separate private R2
   bucket. Staging data is not to be copied into production.
 - The owner created a separate Supabase Free test project. The owner has since
@@ -26,9 +30,10 @@ resources.
   closed-test project must not be described as production, and no staging
   records are to be copied into it.
 - Supabase account access is not available in the local environment, and the
-  Supabase CLI is not installed. The owner must enter the new project's
-  database URL into the hidden local migration prompt. Never put secret keys in
-  chat or source control.
+  Supabase CLI is not installed. Before provisioning production, the owner must
+  create/authorize the production project and enter its database URL only in
+  the hidden local migration prompt. Never put secret keys in chat or source
+  control.
 - The closed-test Hyperdrive/Worker and Access boundary are deployed. A
   synthetic photo upload, photographer-folder R2 layout, old synthetic-photo
   cleanup and one automatic ZIP were verified on 2026-09-25. This is closed
@@ -85,8 +90,9 @@ production launch.
       This does not authorize spending or public production use of test resources.
 - [x] Current scope is a free closed test only; no public launch, paying
       customers, or real guest-photo collection.
-- [x] Owner created a separate Supabase Free project. Keep staging untouched
-      and do not copy its data.
+- [x] Owner created a separate Supabase Free project for closed testing. The
+      old staging resources have since been deleted; do not recreate them or
+      copy their data.
 - [x] Apply and verify the isolated platform schema on the new test project;
       verify all six expected migrations, RLS and denied anon/authenticated
       SELECT. The successful rerun may emit a harmless `platform_migrations
@@ -95,15 +101,17 @@ production launch.
       remains local to the owner and must only be configured as a server-side
       secret.
 - [x] Create a separate private `lumiq-closed-test-photos` R2 bucket. Synthetic
-      closed-test objects were uploaded and the disposable legacy test-photo
-      pairs were later deleted; this bucket is not empty.
+      closed-test objects were uploaded and subsequently emptied by mistake;
+      the owner confirmed they were disposable. Keep the bucket for future
+      synthetic tests; no restoration is needed.
 - [x] Create the separate closed-test Hyperdrive with caching disabled and
       origin connection limit 5; prepare the ignored test Worker config. A
       Wrangler dry-run resolved its Hyperdrive and R2 bindings.
 - [x] Verify active Cloudflare Access for the exact test `workers.dev` host,
       set `PLATFORM_ORIGIN`, then deploy the separate test Worker. An anonymous
       `/healthz` request redirected to Access before Worker execution. Keep
-      staging Hyperdrive, Worker, bucket and DNS untouched.
+      retired staging resources do not exist; do not recreate them or use them
+      for rollback.
 - [x] Attach `lumiq.cam` to the closed-test Worker behind Access. Tet's network
       security filter currently classifies the hostname as Malware; request
       provider review and do not bypass the warning or open public access until
@@ -118,7 +126,7 @@ production launch.
 
 - [ ] Before paid production, owner approves the exact recurring Supabase plan
       after seeing the current organization-level estimate and confirms whether
-      EUR 60 includes any existing staging/account costs.
+      EUR 60 includes any other account-wide subscriptions or usage.
 - [ ] Keep the Worker on Free only if target-environment organizer, guest,
       upload, gallery, QR and export journeys pass under its CPU/query limits;
       otherwise stop and present the USD 5/month Worker Paid alternative.

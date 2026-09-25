@@ -1,22 +1,39 @@
 # Bezmaksas slēgtais tests
 
-Updated: 2026-09-24. Current scope approved by the owner: $0 closed test only.
+Updated: 2026-09-25. Current scope approved by the owner: $0 closed test only.
 This is not production approval. Do not start paid plans, invite public users,
 accept payments, or collect real guest photos.
 
+## Current runtime status
+
+- `lumiq.cam` and `lumiq-closed-test.gkarans-events.workers.dev` are served by
+  the separate `lumiq-closed-test` Worker. Cloudflare Access protects both and
+  its owner policy allows only `guntars.karans@gmail.com`. Cloudflare One now
+  has both the Cloudflare login method and One-time PIN enabled; real OTP email
+  delivery and a fresh login have not yet been verified.
+- The closed-test Worker uses only project `cpweowosocjuccjsyyic`, Hyperdrive
+  `6823aef81a314970bd3da962c2a62966`, and private bucket
+  `lumiq-closed-test-photos`. Do not migrate, reset, or replace those resources.
+- The owner reports that the closed-test bucket contained only disposable test
+  images and emptied it accidentally. Direct remote R2 listing now confirms
+  `0` objects; the Dashboard and Wrangler bucket-size/object-count summaries
+  still show stale nonzero values. The bucket and closed-test database remain.
+- The legacy `lumiq-cam` Worker, staging Hyperdrive `lumiq-supabase`, and both
+  `lumiq-staging-photos` buckets (default and EU jurisdictions) were deleted
+  on 2026-09-25. The owner reports that the Supabase staging project was also
+  deleted; that deletion was not independently verified from Supabase.
+  `app-images` was not touched and remains unrelated legacy storage.
+- The old provisioning instructions below are historical. Do not follow steps
+  that say to keep staging attached to `lumiq.cam`, deploy only to workers.dev,
+  or create the already-existing closed-test resources again.
+
 ## Isolation boundaries
 
-- Keep the existing `lumiq.cam` Worker, staging Hyperdrive, staging database,
-  staging bucket and DNS unchanged.
-- Create a separate Supabase Free project, separate Cloudflare Hyperdrive
-  configuration and separate private R2 bucket for the test. Do not restore or
-  copy staging data into them.
-- Deploy a separately named Worker to its `workers.dev` address only after a
-  Cloudflare Access policy restricts that hostname to the owner and explicitly
-  invited testers. `workers.dev` is public by default. Keep preview URLs off.
-  Do not bind `lumiq.cam`, create a custom domain, change DNS/nameservers, or
-  deploy the base `cloudflare/worker/wrangler.jsonc` file: it targets the
-  existing staging Worker and domain.
+- Keep the closed-test Worker, Supabase project, Hyperdrive, empty R2 bucket and
+  Cloudflare Access policy isolated. The production service does not exist yet.
+- Both the custom domain and workers.dev hostname are Access protected. Keep
+  Access enabled and keep preview URLs off. The old base Wrangler config is
+  removed; use only the ignored closed-test config on the owner's machine.
 - Do not create Render services, paid Supabase plans, Stripe resources, custom
   email, or any other paid add-on.
 - Use only synthetic event names, test accounts and disposable images with
@@ -87,9 +104,10 @@ limit.
    disabled, and origin connection limit 5. Its ID is kept only in the ignored
    local Worker config. An owner-authenticated `/healthz` request later
    returned `database: ready`, confirming a query through the test Hyperdrive.
-   Do not edit or reuse the existing staging Hyperdrive. The separate
-   `lumiq-closed-test-photos` bucket
-   is empty; keep it private and do not enable `r2.dev`.
+   The old staging Hyperdrive has been deleted; do not recreate it. The
+   separate `lumiq-closed-test-photos` bucket is retained for synthetic tests;
+   its disposable objects were deleted, as recorded above. Keep it private and
+   do not enable `r2.dev`.
 5. The owner's Cloudflare account shows the `gkarans-events.workers.dev`
    subdomain. The git-ignored `cloudflare/worker/wrangler.closed-test.jsonc`
    now uses `https://lumiq-closed-test.gkarans-events.workers.dev` as
@@ -111,7 +129,8 @@ limit.
    After version `636cb1e2-2e0e-49d3-914e-47f335f0239f` was deployed, the owner
    rechecked `/healthz` through Access and confirmed `database: ready` and
    `storage: bound`. This verifies Worker startup/migration checks and a query
-   through the test Hyperdrive; it does not prove staging-data isolation. Keep
+   through the test Hyperdrive; it does not prove isolation from future
+   production resources. Keep
    only the owner and explicitly invited tester emails in the allow policy.
    Cloudflare's Access Free plan covers up to 50 users; do not upgrade if the
    dashboard offers a paid plan.
@@ -159,7 +178,7 @@ limit.
    test `workers.dev` origin. The local Supabase adapter regression suite passed
    14/14 tests on 2026-09-23, including signup, password-reset and OAuth redirect
    construction from the supplied origin. Supabase's actual redirect allowlist,
-   email templates, live recovery/OAuth flows and staging-data isolation remain
+   email templates, live recovery/OAuth flows and production-isolation tests remain
    unverified.
 9. Initially test registration, login, event creation, guest page and QR with
    no cloud photos. The Worker R2 adapter now has an app-side monthly operation
@@ -277,17 +296,20 @@ has since changed. It is still a closed test, not production approval.
   deployed to the closed-test Worker. Production remains untouched.
 - The separate closed-test Worker uses only its test Hyperdrive and private
   `lumiq-closed-test-photos` bucket. It remains behind the owner's Cloudflare
-  Access policy. The latest read-only Wrangler listing on 2026-09-25 reports
-  version `2e644352-2e50-4e3d-8618-e65336323824` at 100%. Payments remain
-  disabled. The root `lumiq-cam` Worker is a separate staging deployment.
+  Access policy. A fresh read-only Wrangler listing at 2026-09-25 16:54 UTC
+  reports version `4fc5b617-5815-4c0e-bb2d-e0492279d683` at 100%. Payments
+  remain disabled. The former `lumiq-cam` staging Worker and its Cloudflare
+  resources were deleted; the closed-test Worker is not production.
 - After migration 012 and Worker version `0d6c9cd2-3d03-44bc-8bb5-a4591bde7fc9`,
   the owner reported `/healthz` as `status: ok`, `database: ready`, and
   `storage: bound`. The `service: lumiq-cam` value came from a hard-coded
   handler label, so it did not identify which hostname served the response.
   The handler now uses the configured service name or request hostname; this
-  diagnostic-only change is deployed as `2e644352-2e50-4e3d-8618-e65336323824`.
-  Recheck its hostname-specific response and the authenticated app before
-  considering post-deploy smoke complete.
+  diagnostic-only change and subsequent closed-test updates are included in
+  the active version `4fc5b617-5815-4c0e-bb2d-e0492279d683`. The owner later
+  confirmed that `lumiq.cam` opened the app; the owner-reported health response
+  and CLI deployment record are separate evidence, not proof of production
+  readiness.
 - The owner applied the approved free, account-specific Gathering exception
   in the test database. The authenticated billing page showed `Gathering
   trialing`, `1 / 4` publications used and `3` remaining after the new test
@@ -390,7 +412,7 @@ has since changed. It is still a closed test, not production approval.
   `4e9ace8c-dc93-4451-85e2-2e03bbe8138e`. No live signup, mailbox delivery,
   real Supabase reset, email-change or concurrent-refresh flow has been
   exercised.
-- Still unverified for the closed test: proof that test requests cannot access staging data; complete R2
+- Still unverified for the closed test: proof that test requests cannot access future production data; complete R2
   denial/retry/revocation cases; multi-instance limiter and trusted proxy
   behavior; alerts, capacity, accessibility on physical devices, and a full
   backup/restore drill.
