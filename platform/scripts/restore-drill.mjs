@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
 import { S3Client, PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { assertEmptyPublicSchema, validateRestoreTarget, waitForChildExit } from './restore-safety.mjs';
+import { assertEmptyAuthUsers, assertEmptyPublicSchema, validateRestoreTarget, waitForChildExit } from './restore-safety.mjs';
 import {assertObjectInventory,assertTableInventory} from './restore-verification.mjs';
 
 if (process.env.PLATFORM_RESTORE_DRILL !== 'EMPTY-ISOLATED-TARGET') {
@@ -19,7 +19,7 @@ const database = process.env.PLATFORM_DATABASE_URL;
 const bucket = process.env.PLATFORM_R2_BUCKET;
 const endpoint = process.env.PLATFORM_R2_ENDPOINT;
 if (!database || !bucket || !endpoint || !process.env.PLATFORM_R2_ACCESS_KEY_ID || !process.env.PLATFORM_R2_SECRET_ACCESS_KEY) throw new Error('Load the empty restore target credentials.');
-validateRestoreTarget(database, process.env.PLATFORM_RESTORE_TARGET_REF);
+const targetProjectRef=validateRestoreTarget(database, process.env.PLATFORM_RESTORE_TARGET_REF);
 
 const root = path.resolve(backupDirectory);
 const scripts = path.dirname(fileURLToPath(import.meta.url));
@@ -31,6 +31,8 @@ if (await waitForChildExit(verification) !== 0) {
   throw new Error('Backup integrity verification failed; restore was not started.');
 }
 const manifest = JSON.parse(await readFile(path.join(root, 'manifest.json'), 'utf8'));
+if (targetProjectRef === manifest.database.source_project_ref) throw new Error('Restore target must be a different Supabase project from the source.');
+if (bucket === manifest.bucket) throw new Error('Restore target R2 bucket must be different from the source bucket.');
 
 const s3 = new S3Client({
   region: 'auto',
@@ -46,6 +48,7 @@ if (existing.KeyCount) throw new Error('Restore target bucket is not empty.');
 const sql = postgres(database, { ssl: 'require', max: 1 });
 try {
   await assertEmptyPublicSchema(sql);
+  await assertEmptyAuthUsers(sql);
 } finally {
   await sql.end();
 }
@@ -53,13 +56,25 @@ try {
 const pgRestore = spawn('pg_restore', [
   '--exit-on-error',
   '--no-owner',
-  '--no-acl',
   '--dbname',
   database,
   path.join(root, 'database.dump')
 ], { stdio: 'inherit', windowsHide: true });
 if (await waitForChildExit(pgRestore) !== 0) {
   throw new Error('Database restore failed. Install PostgreSQL client tools and retry.');
+}
+
+const authRestore = spawn('pg_restore', [
+  '--data-only',
+  '--exit-on-error',
+  '--no-owner',
+  '--no-acl',
+  '--dbname',
+  database,
+  path.join(root, manifest.database.auth_file)
+], { stdio: 'inherit', windowsHide: true });
+if (await waitForChildExit(authRestore) !== 0) {
+  throw new Error('Supabase Auth user/identity restore failed.');
 }
 
 const restoredDb=postgres(database,{ssl:'require',max:1});

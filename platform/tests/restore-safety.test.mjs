@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {EventEmitter} from 'node:events';
-import {assertEmptyPublicSchema,validateRestoreTarget,waitForChildExit} from '../scripts/restore-safety.mjs';
+import {assertEmptyAuthUsers,assertEmptyPublicSchema,validateRestoreTarget,waitForChildExit} from '../scripts/restore-safety.mjs';
 
 const ref='cpweowosocjuccjsyyic';
 
@@ -22,8 +22,15 @@ test('restore target confirmation rejects wrong schemes and transaction-pooler p
 });
 
 test('restore preflight refuses databases containing public tables',async()=>{
- await assertEmptyPublicSchema(async()=>[]);
+ const empty=async()=>[];
+ await assertEmptyPublicSchema(empty);
  await assert.rejects(assertEmptyPublicSchema(async()=>[{table_name:'events'}]),/not empty \(events\)/);
+});
+
+test('restore preflight refuses target projects with existing Auth users or identities',async()=>{
+ await assertEmptyAuthUsers(async()=>[]);
+ await assert.rejects(assertEmptyAuthUsers(async()=>[{table_name:'users'}]),/Auth data is not empty \(users\)/);
+ await assert.rejects(assertEmptyAuthUsers(async()=>[{table_name:'identities'}]),/Auth data is not empty \(identities\)/);
 });
 
 test('missing restore utility rejects rather than leaving the drill waiting',async()=>{

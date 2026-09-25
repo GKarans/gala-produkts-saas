@@ -4,7 +4,23 @@ import {GetObjectCommand,ListObjectsV2Command} from '@aws-sdk/client-s3';
 const quoteIdentifier=value=>`"${String(value).replaceAll('"','""')}"`;
 
 export async function captureTableInventory(tx){
- const tables=await tx`select schemaname, tablename from pg_catalog.pg_tables where schemaname='public' order by schemaname,tablename`;
+ const tables=await tx`
+  select t.schemaname, t.tablename
+  from pg_catalog.pg_tables t
+  join pg_catalog.pg_class c on c.relname=t.tablename
+  join pg_catalog.pg_namespace n on n.nspname=t.schemaname and n.oid=c.relnamespace
+  where t.schemaname='public'
+    and not exists (
+     select 1 from pg_catalog.pg_depend d
+     where d.classid='pg_catalog.pg_class'::regclass and d.objid=c.oid
+       and d.refclassid='pg_catalog.pg_extension'::regclass and d.deptype='e'
+    )
+  union all
+  select table_schema as schemaname, table_name as tablename
+  from information_schema.tables
+  where table_schema='auth' and table_name in ('users','identities') and table_type='BASE TABLE'
+  order by schemaname,tablename
+ `;
  const inventory=[];
  for(const table of tables){
   const relation=`${quoteIdentifier(table.schemaname)}.${quoteIdentifier(table.tablename)}`;

@@ -20,3 +20,12 @@ export async function assertEmptyPublicSchema(sql){
  `;
  if(existing.length)throw new Error(`Restore target public schema is not empty (${existing[0].table_name}).`);
 }
+
+export async function assertEmptyAuthUsers(sql){
+ const existing=await sql`
+  select 'users' as table_name where exists (select 1 from auth.users limit 1)
+  union all
+  select 'identities' as table_name where exists (select 1 from auth.identities limit 1)
+ `;
+ if(existing.length)throw new Error(`Restore target Auth data is not empty (${existing[0].table_name}).`);
+}
